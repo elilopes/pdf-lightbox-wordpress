@@ -336,6 +336,9 @@
         modal.querySelector('.psv-ai-panel').hidden = true;
         modal.querySelector('.psv-qr-panel').hidden = true;
         modal.querySelector('.psv-dialog').classList.remove('psv-reading-mode', 'psv-dark-mode', 'psv-high-contrast');
+        ['theme', 'contrast', 'reader'].forEach(function (action) {
+            modal.querySelector('[data-a="' + action + '"]').setAttribute('aria-pressed', 'false');
+        });
         modal.querySelector('.psv-status').hidden = false;
         modal.querySelector('.psv-status').textContent = config.strings?.loading || 'Carregando PDF…';
         modal.querySelector('.psv-canvas').hidden = true;
