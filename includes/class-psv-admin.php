@@ -41,6 +41,9 @@ class PSV_Admin {
         global $wpdb;
 
         $email_address = sanitize_email($email_address);
+        if (!is_email($email_address)) {
+            return array('data' => array(), 'done' => true);
+        }
         $page = max(1, absint($page));
         $per_page = 50;
         $table = PSV_Core::table();
@@ -100,6 +103,14 @@ class PSV_Admin {
         global $wpdb;
 
         $email_address = sanitize_email($email_address);
+        if (!is_email($email_address)) {
+            return array(
+                'items_removed' => false,
+                'items_retained' => false,
+                'messages' => array(),
+                'done' => true,
+            );
+        }
         $table = PSV_Core::table();
 
         // Delete in small batches. Since each batch is removed, the next call
