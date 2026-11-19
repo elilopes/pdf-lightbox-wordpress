@@ -932,6 +932,157 @@
         output.textContent = 'Não há outras ocorrências. A busca será reiniciada na próxima tentativa.';
     }
 
+    function escapeXml(value) {
+        return String(value).replace(/[&<>"']/g, function (character) {
+            return {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&apos;'
+            }[character];
+        });
+    }
+
+    function calculateCrc32(bytes) {
+        let crc = 0xFFFFFFFF;
+        for (let index = 0; index < bytes.length; index += 1) {
+            crc ^= bytes[index];
+            for (let bit = 0; bit < 8; bit += 1) {
+                crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+            }
+        }
+        return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+
+    /**
+     * Build a minimal standards-compliant DOCX package locally.
+     * ZIP entries are stored without compression to avoid a runtime dependency.
+     */
+    function createDocxBlob(title, pages) {
+        const encoder = new TextEncoder();
+        const files = [
+            {
+                name: '[Content_Types].xml',
+                content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+                    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+                    '<Default Extension="xml" ContentType="application/xml"/>' +
+                    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+                    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+                    '</Types>'
+            },
+            {
+                name: '_rels/.rels',
+                content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+                    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+                    '</Relationships>'
+            },
+            {
+                name: 'word/styles.xml',
+                content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+                    '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+                    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/>' +
+                    '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial"/><w:sz w:val="22"/></w:rPr></w:style>' +
+                    '</w:styles>'
+            }
+        ];
+
+        const paragraph = function (text, style) {
+            const styleXml = style ? '<w:pPr><w:pStyle w:val="' + style + '"/></w:pPr>' : '';
+            return '<w:p>' + styleXml + '<w:r><w:t xml:space="preserve">' +
+                escapeXml(text) + '</w:t></w:r></w:p>';
+        };
+
+        let documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+            '<w:body>' + paragraph(title || 'Documento PDF', 'Title');
+
+        pages.forEach(function (lines, index) {
+            if (index > 0) {
+                documentXml += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+            }
+            documentXml += paragraph('Página ' + (index + 1), 'Heading1');
+            lines.forEach(function (line) {
+                if (line) documentXml += paragraph(line);
+            });
+        });
+
+        documentXml += '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/>' +
+            '<w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" ' +
+            'w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>';
+        files.push({ name: 'word/document.xml', content: documentXml });
+
+        const localEntries = [];
+        const centralEntries = [];
+        let localOffset = 0;
+
+        files.forEach(function (file) {
+            const nameBytes = encoder.encode(file.name);
+            const dataBytes = encoder.encode(file.content);
+            const crc = calculateCrc32(dataBytes);
+            const local = new Uint8Array(30 + nameBytes.length + dataBytes.length);
+            const localView = new DataView(local.buffer);
+
+            localView.setUint32(0, 0x04034B50, true);
+            localView.setUint16(4, 20, true);
+            localView.setUint16(6, 0, true);
+            localView.setUint16(8, 0, true);
+            localView.setUint16(10, 0, true);
+            localView.setUint16(12, 0x21, true);
+            localView.setUint32(14, crc, true);
+            localView.setUint32(18, dataBytes.length, true);
+            localView.setUint32(22, dataBytes.length, true);
+            localView.setUint16(26, nameBytes.length, true);
+            localView.setUint16(28, 0, true);
+            local.set(nameBytes, 30);
+            local.set(dataBytes, 30 + nameBytes.length);
+            localEntries.push(local);
+
+            const central = new Uint8Array(46 + nameBytes.length);
+            const centralView = new DataView(central.buffer);
+            centralView.setUint32(0, 0x02014B50, true);
+            centralView.setUint16(4, 20, true);
+            centralView.setUint16(6, 20, true);
+            centralView.setUint16(8, 0, true);
+            centralView.setUint16(10, 0, true);
+            centralView.setUint16(12, 0, true);
+            centralView.setUint16(14, 0x21, true);
+            centralView.setUint32(16, crc, true);
+            centralView.setUint32(20, dataBytes.length, true);
+            centralView.setUint32(24, dataBytes.length, true);
+            centralView.setUint16(28, nameBytes.length, true);
+            centralView.setUint16(30, 0, true);
+            centralView.setUint16(32, 0, true);
+            centralView.setUint16(34, 0, true);
+            centralView.setUint16(36, 0, true);
+            centralView.setUint32(38, 0, true);
+            centralView.setUint32(42, localOffset, true);
+            central.set(nameBytes, 46);
+            centralEntries.push(central);
+            localOffset += local.length;
+        });
+
+        const centralSize = centralEntries.reduce(function (total, entry) {
+            return total + entry.length;
+        }, 0);
+        const end = new Uint8Array(22);
+        const endView = new DataView(end.buffer);
+        endView.setUint32(0, 0x06054B50, true);
+        endView.setUint16(4, 0, true);
+        endView.setUint16(6, 0, true);
+        endView.setUint16(8, files.length, true);
+        endView.setUint16(10, files.length, true);
+        endView.setUint32(12, centralSize, true);
+        endView.setUint32(16, localOffset, true);
+        endView.setUint16(20, 0, true);
+
+        return new Blob(localEntries.concat(centralEntries, [end]), {
+            type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        });
+    }
+
     async function exportDocx() {
         if (!pdfDocument || !activeDocument) {
             window.alert('Abra um PDF antes de exportar.');
@@ -945,39 +1096,9 @@
         button.textContent = 'Preparando DOCX…';
 
         try {
-            if (!window.docx) {
-                await new Promise(function (resolve, reject) {
-                    const existing = document.querySelector('script[data-psv-docx]');
-                    if (existing) {
-                        existing.addEventListener('load', resolve, { once: true });
-                        existing.addEventListener('error', reject, { once: true });
-                        if (window.docx) resolve();
-                        return;
-                    }
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js';
-                    script.async = true;
-                    script.dataset.psvDocx = '1';
-                    script.onload = resolve;
-                    script.onerror = function () {
-                        reject(new Error('Não foi possível carregar o componente de exportação DOCX.'));
-                    };
-                    document.head.appendChild(script);
-                });
-            }
-
-            if (!window.docx || !window.docx.Document || !window.docx.Packer) {
-                throw new Error('O componente DOCX não está disponível neste navegador.');
-            }
-
             const sourceDocument = pdfDocument;
             const sourceSession = sessionId;
-            const paragraphs = [
-                new window.docx.Paragraph({
-                    text: activeDocument.title || 'Documento PDF',
-                    heading: window.docx.HeadingLevel.TITLE
-                })
-            ];
+            const extractedPages = [];
 
             for (let number = 1; number <= sourceDocument.numPages; number += 1) {
                 if (sourceSession !== sessionId || sourceDocument !== pdfDocument) {
@@ -1002,25 +1123,16 @@
                 });
 
                 lines.sort(function (a, b) { return b.y - a.y; });
-                paragraphs.push(new window.docx.Paragraph({
-                    text: 'Página ' + number,
-                    heading: window.docx.HeadingLevel.HEADING_1
-                }));
-
-                lines.forEach(function (line) {
-                    const text = line.parts.join(' ').replace(/\s+/g, ' ').trim();
-                    if (text) paragraphs.push(new window.docx.Paragraph({ text: text }));
-                });
+                extractedPages.push(lines.map(function (line) {
+                    return line.parts.join(' ').replace(/\s+/g, ' ').trim();
+                }).filter(Boolean));
             }
 
-            const documentFile = new window.docx.Document({
-                sections: [{ properties: {}, children: paragraphs }]
-            });
-            const blob = await window.docx.Packer.toBlob(documentFile);
+            const blob = createDocxBlob(activeDocument.title || 'Documento PDF', extractedPages);
             const objectUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
             const safeTitle = String(activeDocument.title || 'documento')
-                .replace(/[\\\\/:*?"<>|]+/g, '-')
+                .replace(/[\\/:*?"<>|]+/g, '-')
                 .replace(/\s+/g, '-')
                 .slice(0, 80);
             link.href = objectUrl;
