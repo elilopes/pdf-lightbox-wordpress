@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PDF Smart Viewer
  * Description: Visualizador PDF em Lightbox com miniaturas, zoom, pesquisa, anotações locais, favoritos, histórico, comentários moderados e Google Drive.
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: PDF Smart Viewer
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -17,7 +17,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('PSV_VERSION')) {
-    define('PSV_VERSION', '1.3.0');
+    define('PSV_VERSION', '1.4.0');
 }
 if (!defined('PSV_FILE')) {
     define('PSV_FILE', __FILE__);
