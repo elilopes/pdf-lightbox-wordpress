@@ -3,7 +3,7 @@ Contributors: pdfsmartviewer
 Tags: pdf, lightbox, viewer, google drive, comments
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 
 PDF Lightbox com miniaturas, zoom, busca, impressão, download, comentários públicos moderados, respostas, anotações particulares, favoritos, histórico, links para páginas e Google Drive.
@@ -46,8 +46,13 @@ PDF.js é carregado por CDN; para ambientes restritos, hospede os arquivos local
 O link compartilhado utiliza os parâmetros ?pdf=URL& page=N na URL atual; a página deve ter o plugin carregado.
 Teste OAuth, CORS, cache e compatibilidade no ambiente de homologação antes de produção.
 
+== Privacidade ==
+O plugin armazena nome, e-mail, conteúdo do comentário, URL do documento, página, estado de moderação e data no banco de dados do site. O e-mail não é exibido publicamente. Um transient antispam temporário utiliza um hash do endereço IP por até 60 segundos. O plugin disponibiliza as ferramentas de exportação e exclusão de dados pessoais do WordPress.
+
+A integração opcional com Google Drive só é acionada quando o visitante escolhe essa função. O Google processa a autenticação e o envio conforme seus próprios termos. O PDF é processado no navegador; documentos hospedados em outro domínio precisam permitir CORS.
+
 == Changelog ==
-= 1.2.0 =
+= 1.3.0 =\n* Integração com as ferramentas de exportação e exclusão de dados pessoais do WordPress.\n* Inclusão das informações de privacidade e tratamento de dados.\n* Respostas limitadas a comentários principais, impedindo encadeamento ilimitado.\n* Limite de segurança na resposta da API e tratamento explícito de erros de banco de dados.\n* Carregamento dos recursos do painel administrativo somente no wp-admin.\n* Detecção de elementos HTML personalizados para carregamento condicional dos recursos.\n\n= 1.2.0 =
 * Exportação do texto dos PDFs para DOCX diretamente no Lightbox.
 * Respostas dos comentários recolhidas por padrão, com expansão individual.
 * Verificações de requisitos, arquivos essenciais e instalação da tabela; falhas de bootstrap e ativação são tratadas sem interromper o WordPress.
