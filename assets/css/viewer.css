@@ -470,3 +470,17 @@
 .psv-qr-open { display: inline-block; margin-bottom: 8px; color: #1d4ed8; }
 
 @media (max-width: 700px) { .psv-dialog { height: 100vh !important; max-height: 100vh !important; } }
+
+@media (max-width: 700px) {
+    .psv-dialog.psv-show-sidebar .psv-sidebar {
+        display: block !important;
+        position: absolute;
+        z-index: 20;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: min(82vw, 290px);
+        max-height: 100%;
+        box-shadow: 6px 0 24px #0005;
+    }
+}
