@@ -5,7 +5,7 @@ class PSV_Admin {
  private function __construct(){add_action('admin_menu',[$this,'menu']);add_action('admin_init',[$this,'settings']);add_action('admin_post_psv_moderate',[$this,'moderate']);}
  public function menu(){add_menu_page('PDF Smart Viewer','PDF Smart Viewer','manage_options','psv-settings',[$this,'page'],'dashicons-pdf',59);add_submenu_page('psv-settings','Comentários','Comentários','moderate_comments','psv-comments',[$this,'comments_page']);}
  public function settings(){register_setting('psv_settings_group','psv_settings',['sanitize_callback'=>[$this,'sanitize']]);}
- public function sanitize($in){return ['google_client_id'=>sanitize_text_field($in['google_client_id']??''),'auto_detect'=>empty($in['auto_detect'])?0:1];}
+ public function sanitize($in){$in=is_array($in)?$in:[];return ['google_client_id'=>sanitize_text_field(wp_unslash($in['google_client_id']??'')),'auto_detect'=>empty($in['auto_detect'])?0:1];}
  public function page(){
   if(!current_user_can('manage_options'))return;$o=get_option('psv_settings',[]); ?>
   <div class="wrap"><h1>PDF Smart Viewer</h1><form method="post" action="options.php"><?php settings_fields('psv_settings_group'); ?>
