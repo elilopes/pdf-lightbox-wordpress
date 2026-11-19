@@ -125,6 +125,7 @@
         `;
 
         document.body.appendChild(modal);
+        modal.querySelector('[data-a="drive"]').hidden = !config.googleClientId;
 
         modal.addEventListener('click', function (event) {
             if (event.target === modal || event.target.closest('[data-a="close"]')) {
@@ -1287,79 +1288,114 @@
         }
     }
 
-    function saveToDrive() {
-        if (!config.googleClientId || !window.google?.accounts?.oauth2) {
+    function loadGoogleIdentity() {
+        if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+            return Promise.resolve();
+        }
+
+        return new Promise(function (resolve, reject) {
+            const existing = document.querySelector('script[data-psv-google-identity]');
+            if (existing) {
+                existing.addEventListener('load', resolve, { once: true });
+                existing.addEventListener('error', reject, { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.dataset.psvGoogleIdentity = '1';
+            script.onload = resolve;
+            script.onerror = function () {
+                reject(new Error('Não foi possível carregar a autenticação do Google.'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    async function saveToDrive() {
+        if (!config.googleClientId) {
             window.alert('Configure o Client ID do Google no painel.');
             return;
         }
 
         const documentToSave = activeDocument;
         const currentSession = sessionId;
-        const tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: config.googleClientId,
-            scope: 'https://www.googleapis.com/auth/drive.file',
 
-            callback: async function (tokenResponse) {
-                if (tokenResponse.error || currentSession !== sessionId) {
-                    if (tokenResponse.error) {
-                        window.alert('Autorização Google não concluída.');
-                    }
-                    return;
-                }
-
-                try {
-                    const response = await fetch(documentToSave.url);
-
-                    if (!response.ok) {
-                        throw new Error('PDF indisponível ou bloqueado por CORS.');
-                    }
-
-                    const blob = await response.blob();
-                    const boundary = 'psv_' + Math.random().toString(16).slice(2);
-                    const metadata = {
-                        name: documentToSave.title + '.pdf',
-                        mimeType: 'application/pdf'
-                    };
-                    const body = new Blob([
-                        '--' + boundary + '\r\n',
-                        'Content-Type: application/json; charset=UTF-8\r\n\r\n',
-                        JSON.stringify(metadata),
-                        '\r\n--' + boundary + '\r\n',
-                        'Content-Type: application/pdf\r\n\r\n',
-                        blob,
-                        '\r\n--' + boundary + '--'
-                    ], {
-                        type: 'multipart/related; boundary=' + boundary
-                    });
-
-                    const upload = await fetch(
-                        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
-                        {
-                            method: 'POST',
-                            headers: {
-                                Authorization: 'Bearer ' + tokenResponse.access_token
-                            },
-                            body: body
-                        }
-                    );
-                    const result = await upload.json();
-
-                    if (!upload.ok) {
-                        throw new Error(result.error?.message || 'Falha ao enviar.');
-                    }
-
-                    if (currentSession === sessionId) {
-                        window.alert('Documento salvo no Google Drive.');
-                    }
-                } catch (error) {
-                    if (currentSession === sessionId) {
-                        window.alert(error.message);
-                    }
-                }
+        try {
+            await loadGoogleIdentity();
+            if (!window.google?.accounts?.oauth2) {
+                throw new Error('O serviço de autenticação do Google não está disponível.');
             }
-        });
 
-        tokenClient.requestAccessToken({ prompt: 'consent' });
+            const tokenClient = window.google.accounts.oauth2.initTokenClient({
+                client_id: config.googleClientId,
+                scope: 'https://www.googleapis.com/auth/drive.file',
+
+                callback: async function (tokenResponse) {
+                    if (tokenResponse.error || currentSession !== sessionId) {
+                        if (tokenResponse.error) {
+                            window.alert('Autorização Google não concluída.');
+                        }
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(documentToSave.url);
+                        if (!response.ok) {
+                            throw new Error('PDF indisponível ou bloqueado por CORS.');
+                        }
+
+                        const blob = await response.blob();
+                        const boundary = 'psv_' + Math.random().toString(16).slice(2);
+                        const metadata = {
+                            name: documentToSave.title + '.pdf',
+                            mimeType: 'application/pdf'
+                        };
+                        const body = new Blob([
+                            '--' + boundary + '\r\n',
+                            'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+                            JSON.stringify(metadata),
+                            '\r\n--' + boundary + '\r\n',
+                            'Content-Type: application/pdf\r\n\r\n',
+                            blob,
+                            '\r\n--' + boundary + '--'
+                        ], {
+                            type: 'multipart/related; boundary=' + boundary
+                        });
+
+                        const upload = await fetch(
+                            'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink',
+                            {
+                                method: 'POST',
+                                headers: {
+                                    Authorization: 'Bearer ' + tokenResponse.access_token
+                                },
+                                body: body
+                            }
+                        );
+                        const result = await upload.json();
+
+                        if (!upload.ok) {
+                            throw new Error(result.error?.message || 'Falha ao enviar.');
+                        }
+
+                        if (currentSession === sessionId) {
+                            window.alert('Documento salvo no Google Drive.');
+                        }
+                    } catch (error) {
+                        if (currentSession === sessionId) {
+                            window.alert(error.message);
+                        }
+                    }
+                }
+            });
+
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        } catch (error) {
+            window.alert(error.message || 'Não foi possível iniciar a integração com o Google Drive.');
+        }
     }
 
     function initializeTriggers(root) {
