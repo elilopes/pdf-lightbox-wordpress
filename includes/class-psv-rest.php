@@ -48,6 +48,18 @@ class PSV_REST {
             'callback' => array($this, 'refresh_nonce'),
             'permission_callback' => '__return_true',
         ));
+
+        register_rest_route('psv/v1', '/document', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => array($this, 'get_document'),
+            'permission_callback' => '__return_true',
+            'args' => array(
+                'url' => array(
+                    'required' => true,
+                    'sanitize_callback' => 'sanitize_text_field',
+                ),
+            ),
+        ));
     }
 
     /**
@@ -58,6 +70,26 @@ class PSV_REST {
         $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         $response->header('Pragma', 'no-cache');
         $response->header('Expires', 'Wed, 11 Jan 1984 05:00:00 GMT');
+        return $response;
+    }
+
+    /**
+     * Resolve every frontend URL through the same server-side canonicalizer and key.
+     */
+    public function get_document($request) {
+        $raw_url = $request->get_param('url');
+        $url = is_scalar($raw_url) ? PSV_Core::normalize_url($raw_url) : '';
+
+        if (!$url) {
+            return new WP_Error('psv_document', __('Endereço do PDF inválido.', 'pdf-smart-viewer'), array('status' => 400));
+        }
+
+        $response = new WP_REST_Response(array(
+            'url' => $url,
+            'key' => hash('sha256', $url),
+        ));
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        $response->header('Pragma', 'no-cache');
         return $response;
     }
 
@@ -111,7 +143,7 @@ class PSV_REST {
             );
         }
 
-        return rest_ensure_response(array(
+        $response = new WP_REST_Response(array(
             'comments' => $rows,
             'page' => $page,
             'per_page' => $per_page,
@@ -120,6 +152,8 @@ class PSV_REST {
             'has_previous' => $page > 1,
             'has_more' => $page < $total_pages,
         ));
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        return $response;
     }
 
     public function add_comment($request) {
