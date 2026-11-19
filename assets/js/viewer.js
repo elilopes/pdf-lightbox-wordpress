@@ -67,6 +67,7 @@
                         <button type="button" data-a="share">Compartilhar página</button>
                         <button type="button" data-a="print" title="Abre o PDF em outra aba">Abrir PDF</button>
                         <button type="button" data-a="download">Baixar</button>
+                        <button type="button" data-a="docx" title="Exportar o texto do PDF para Word">Exportar DOCX</button>
                         <button type="button" data-a="drive">Drive</button>
                         <button type="button" data-a="fullscreen">Tela cheia</button>
                         <button type="button" data-a="close" class="psv-close" aria-label="Fechar">×</button>
@@ -658,16 +659,36 @@
                     });
                     item.append(author, text, reply);
 
-                    rows.filter(function (child) {
+                    const replies = rows.filter(function (child) {
                         return Number(child.parent_id) === Number(row.id);
-                    }).forEach(function (child) {
-                        const replyItem = createElement('div', 'psv-reply-item');
-                        replyItem.append(
-                            createElement('b', '', child.author_name + ' respondeu'),
-                            createElement('p', '', child.comment_text)
-                        );
-                        item.appendChild(replyItem);
                     });
+                    if (replies.length) {
+                        const replyToggle = createElement(
+                            'button',
+                            'psv-replies-toggle',
+                            '▸ Exibir ' + replies.length + (replies.length === 1 ? ' resposta' : ' respostas')
+                        );
+                        const replyList = createElement('div', 'psv-replies-list');
+                        replyList.hidden = true;
+                        replyToggle.type = 'button';
+                        replyToggle.setAttribute('aria-expanded', 'false');
+                        replyToggle.addEventListener('click', function () {
+                            const expanded = !replyList.hidden;
+                            replyList.hidden = expanded;
+                            replyToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                            replyToggle.textContent = (expanded ? '▸ Exibir ' : '▾ Ocultar ') +
+                                replies.length + (replies.length === 1 ? ' resposta' : ' respostas');
+                        });
+                        replies.forEach(function (child) {
+                            const replyItem = createElement('div', 'psv-reply-item');
+                            replyItem.append(
+                                createElement('b', '', child.author_name + ' respondeu'),
+                                createElement('p', '', child.comment_text)
+                            );
+                            replyList.appendChild(replyItem);
+                        });
+                        item.append(replyToggle, replyList);
+                    }
                     list.appendChild(item);
                 });
             }
@@ -911,6 +932,111 @@
         output.textContent = 'Não há outras ocorrências. A busca será reiniciada na próxima tentativa.';
     }
 
+    async function exportDocx() {
+        if (!pdfDocument || !activeDocument) {
+            window.alert('Abra um PDF antes de exportar.');
+            return;
+        }
+
+        const modal = getModal();
+        const button = modal.querySelector('[data-a="docx"]');
+        const originalLabel = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Preparando DOCX…';
+
+        try {
+            if (!window.docx) {
+                await new Promise(function (resolve, reject) {
+                    const existing = document.querySelector('script[data-psv-docx]');
+                    if (existing) {
+                        existing.addEventListener('load', resolve, { once: true });
+                        existing.addEventListener('error', reject, { once: true });
+                        if (window.docx) resolve();
+                        return;
+                    }
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js';
+                    script.async = true;
+                    script.dataset.psvDocx = '1';
+                    script.onload = resolve;
+                    script.onerror = function () {
+                        reject(new Error('Não foi possível carregar o componente de exportação DOCX.'));
+                    };
+                    document.head.appendChild(script);
+                });
+            }
+
+            if (!window.docx || !window.docx.Document || !window.docx.Packer) {
+                throw new Error('O componente DOCX não está disponível neste navegador.');
+            }
+
+            const sourceDocument = pdfDocument;
+            const sourceSession = sessionId;
+            const paragraphs = [
+                new window.docx.Paragraph({
+                    text: activeDocument.title || 'Documento PDF',
+                    heading: window.docx.HeadingLevel.TITLE
+                })
+            ];
+
+            for (let number = 1; number <= sourceDocument.numPages; number += 1) {
+                if (sourceSession !== sessionId || sourceDocument !== pdfDocument) {
+                    throw new Error('A exportação foi interrompida porque o documento foi fechado.');
+                }
+
+                const page = await sourceDocument.getPage(number);
+                const content = await page.getTextContent();
+                const lines = [];
+
+                content.items.forEach(function (item) {
+                    if (!item.str || !item.str.trim()) return;
+                    const y = Math.round(item.transform ? item.transform[5] : 0);
+                    let line = lines.find(function (entry) {
+                        return Math.abs(entry.y - y) <= 2;
+                    });
+                    if (!line) {
+                        line = { y: y, parts: [] };
+                        lines.push(line);
+                    }
+                    line.parts.push(item.str);
+                });
+
+                lines.sort(function (a, b) { return b.y - a.y; });
+                paragraphs.push(new window.docx.Paragraph({
+                    text: 'Página ' + number,
+                    heading: window.docx.HeadingLevel.HEADING_1
+                }));
+
+                lines.forEach(function (line) {
+                    const text = line.parts.join(' ').replace(/\\s+/g, ' ').trim();
+                    if (text) paragraphs.push(new window.docx.Paragraph({ text: text }));
+                });
+            }
+
+            const documentFile = new window.docx.Document({
+                sections: [{ properties: {}, children: paragraphs }]
+            });
+            const blob = await window.docx.Packer.toBlob(documentFile);
+            const objectUrl = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const safeTitle = String(activeDocument.title || 'documento')
+                .replace(/[\\\\/:*?"<>|]+/g, '-')
+                .replace(/\\s+/g, '-')
+                .slice(0, 80);
+            link.href = objectUrl;
+            link.download = (safeTitle || 'documento') + '.docx';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1000);
+        } catch (error) {
+            window.alert(error.message || 'Não foi possível exportar o PDF para DOCX.');
+        } finally {
+            button.disabled = false;
+            button.textContent = originalLabel;
+        }
+    }
+
     function handleToolbarAction(event) {
         const button = event.target.closest('[data-a]');
 
@@ -1016,6 +1142,10 @@
 
             case 'print':
                 window.open(activeDocument.url, '_blank', 'noopener');
+                break;
+
+            case 'docx':
+                exportDocx();
                 break;
 
             case 'download': {
