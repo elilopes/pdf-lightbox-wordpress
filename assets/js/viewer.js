@@ -1008,7 +1008,7 @@
                 }));
 
                 lines.forEach(function (line) {
-                    const text = line.parts.join(' ').replace(/\\s+/g, ' ').trim();
+                    const text = line.parts.join(' ').replace(/\s+/g, ' ').trim();
                     if (text) paragraphs.push(new window.docx.Paragraph({ text: text }));
                 });
             }
