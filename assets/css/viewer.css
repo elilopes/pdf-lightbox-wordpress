@@ -125,6 +125,10 @@
     display: none !important;
 }
 
+.psv-comment-pagination[hidden] {
+    display: none !important;
+}
+
 .psv-comment-pagination {
     display: flex;
     align-items: center;
