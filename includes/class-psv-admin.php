@@ -162,7 +162,7 @@ class PSV_Admin {
             'items_removed' => $removed > 0,
             'items_retained' => false,
             'messages' => array(),
-            'done' => true,
+            'done' => count($ids) < 50,
         );
     }
 
