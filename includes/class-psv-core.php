@@ -107,7 +107,7 @@ final class PSV_Core {
 
         $options = get_option('psv_settings', array());
         if (!$uses_viewer && !empty($options['auto_detect'])) {
-            $uses_viewer = (bool) preg_match('/\.pdf(?:[?#\s"\']|$)/i', $content);
+            $uses_viewer = (bool) preg_match('/\.pdf/i', $content);
         }
 
         if ($uses_viewer) {
