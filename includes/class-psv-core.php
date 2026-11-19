@@ -73,7 +73,7 @@ final class PSV_Core {
         return wp_http_validate_url($url) ? $url : '';
     }
 
-    private static function normalize_url_component($value, $allowed) {
+    private static function normalize_url_component($value) {
         $encoded = rawurlencode($value);
         $encoded = str_replace(
             array('%2F', '%3A', '%40', '%21', '%24', '%26', '%27', '%28', '%29', '%2A', '%2B', '%2C', '%3B', '%3D'),
@@ -201,7 +201,7 @@ final class PSV_Core {
             'download' => 'yes',
         ), (array) $atts, 'pdf_viewer');
 
-        $url = esc_url_raw($atts['url'], array('http', 'https'));
+        $url = $atts['url'];
         $attachment_id = absint($atts['id']);
         if (!$url && $attachment_id) {
             $url = wp_get_attachment_url($attachment_id);
@@ -254,7 +254,7 @@ final class PSV_Core {
         ), (array) $atts, 'pdf_lightbox');
 
         return $this->shortcode(array(
-            'url' => esc_url_raw($atts['url'], array('http', 'https')),
+            'url' => $atts['url'],
             'title' => sanitize_text_field($atts['text']),
             'comments' => 'yes' === $atts['comments'] ? 'yes' : 'no',
             'button' => 'yes',
@@ -280,7 +280,7 @@ final class PSV_Core {
             'render_callback' => function ($attributes) {
                 $url = isset($attributes['url']) ? PSV_Core::normalize_url($attributes['url']) : '';
                 $title = isset($attributes['title']) ? sanitize_text_field($attributes['title']) : 'Visualizar PDF';
-                return do_shortcode('[pdf_viewer url="' . esc_url($url) . '" title="' . esc_attr($title) . '"]');
+                return PSV_Core::instance()->shortcode(array('url' => $url, 'title' => $title));
             },
             'attributes' => array(
                 'url' => array('type' => 'string', 'default' => ''),
