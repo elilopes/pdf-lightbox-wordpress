@@ -46,7 +46,7 @@ class PSV_Admin {
         $table = PSV_Core::table();
         $rows = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT document_url, page_number, author_name, author_email, comment_text, status, created_at
+                "SELECT id, document_url, page_number, author_name, author_email, comment_text, status, created_at
                 FROM {$table}
                 WHERE author_email = %s
                 ORDER BY id ASC
@@ -63,7 +63,7 @@ class PSV_Admin {
             $data[] = array(
                 'group_id' => 'pdf-smart-viewer-comments',
                 'group_label' => __('PDF Smart Viewer comments', 'pdf-smart-viewer'),
-                'item_id' => 'psv-comment-' . md5($email_address . '|' . $row['created_at'] . '|' . $row['document_url']),
+                'item_id' => 'psv-comment-' . absint($row['id']),
                 'data' => array(
                     array('name' => __('Document URL', 'pdf-smart-viewer'), 'value' => $row['document_url']),
                     array('name' => __('Page', 'pdf-smart-viewer'), 'value' => (string) $row['page_number']),
@@ -101,20 +101,29 @@ class PSV_Admin {
 
         $email_address = sanitize_email($email_address);
         $table = PSV_Core::table();
-        $root_ids = $wpdb->get_col(
+
+        // Delete in small batches. Since each batch is removed, the next call
+        // can safely fetch the next first page without skipping rows.
+        $ids = $wpdb->get_col(
             $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE author_email = %s AND parent_id = 0",
+                "SELECT id FROM {$table} WHERE author_email = %s ORDER BY id ASC LIMIT 50",
                 $email_address
             )
         );
 
-        if ($root_ids) {
-            $root_ids = array_map('absint', $root_ids);
-            $id_list = implode(',', $root_ids);
-            $wpdb->query("UPDATE {$table} SET parent_id = 0 WHERE parent_id IN ({$id_list})");
+        if (!$ids) {
+            return array(
+                'items_removed' => false,
+                'items_retained' => false,
+                'messages' => array(),
+                'done' => true,
+            );
         }
 
-        $removed = $wpdb->delete($table, array('author_email' => $email_address), array('%s'));
+        $ids = array_map('absint', $ids);
+        $id_list = implode(',', $ids);
+        $wpdb->query("UPDATE {$table} SET parent_id = 0 WHERE parent_id IN ({$id_list}) AND author_email <> '" . esc_sql($email_address) . "'");
+        $removed = $wpdb->query("DELETE FROM {$table} WHERE id IN ({$id_list})");
         if (false === $removed) {
             return array(
                 'items_removed' => false,
@@ -141,11 +150,11 @@ class PSV_Admin {
         }
 
         $content = '<p>' . esc_html__(
-            'PDF Smart Viewer stores the name, email address, comment text, document URL, page number, moderation status and submission date for comments submitted by visitors. The email address is used for moderation and is not displayed publicly. A one-minute anti-spam rate-limit transient is generated from the visitor IP address. Comment records are stored in this site database until an administrator deletes them or the site owner removes them.',
+            'O PDF Smart Viewer armazena nome, endereço de e-mail, texto do comentário, URL do documento, número da página, situação da moderação e data de envio dos comentários. O e-mail é utilizado para moderação e não é exibido publicamente. Um registro temporário antispam, com duração de um minuto, é gerado a partir do endereço IP do visitante. Os comentários ficam armazenados no banco de dados deste site até que um administrador os exclua ou o responsável pelo site solicite sua remoção.',
             'pdf-smart-viewer'
         ) . '</p>';
         $content .= '<p>' . esc_html__(
-            'If Google Drive integration is configured, the visitor may choose to connect to Google and upload the selected PDF to their own Drive account. This connection is initiated only by the visitor and is subject to Google privacy terms. PDF files are processed in the visitor browser; files hosted on another domain must permit CORS.',
+            'Se a integração com o Google Drive estiver configurada, o visitante poderá optar por conectar-se ao Google e enviar o PDF selecionado para sua própria conta do Drive. A conexão é iniciada somente pelo visitante e está sujeita às políticas de privacidade do Google. Os arquivos PDF são processados no navegador; arquivos hospedados em outro domínio precisam permitir CORS.',
             'pdf-smart-viewer'
         ) . '</p>';
 
