@@ -139,6 +139,8 @@ class PSV_REST {
         } else {
             $prompt = 'Responda à pergunta "' . $question . '" com base neste documento. Não invente informações.\n\nDOCUMENTO:\n' . $text;
         }
+        // Reserve the rate-limit slot before contacting the provider to prevent parallel bursts.
+        set_transient($rate_key, 1, MINUTE_IN_SECONDS);
         $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
             'timeout' => 45,
             'headers' => array('Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json'),
@@ -161,7 +163,6 @@ class PSV_REST {
             error_log('[PDF Smart Viewer] AI provider returned HTTP ' . $status);
             return new WP_Error('psv_ai_provider', __('O serviço de IA não conseguiu processar esta solicitação.', 'pdf-smart-viewer'), array('status' => 502));
         }
-        set_transient($rate_key, 1, MINUTE_IN_SECONDS);
         $result = sanitize_textarea_field($body['choices'][0]['message']['content']);
         $rest_response = new WP_REST_Response(array('answer' => $result));
         $rest_response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
