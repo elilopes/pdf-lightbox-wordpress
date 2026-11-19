@@ -373,6 +373,7 @@
         modal.querySelector('.psv-canvas').hidden = true;
         modal.querySelector('.psv-thumbs').replaceChildren();
         modal.querySelector('.psv-comment-list').textContent = '';
+        loadBookmarks();
         clearReply();
         updateBookmarkButton();
         addHistory(data);
