@@ -17,6 +17,7 @@ class PSV_Admin {
     private function __construct() {
         add_action('admin_menu', array($this, 'menu'));
         add_action('admin_init', array($this, 'settings'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_media'));
         add_action('admin_post_psv_moderate', array($this, 'moderate'));
         add_filter('wp_privacy_personal_data_exporters', array($this, 'register_privacy_exporter'));
         add_filter('wp_privacy_personal_data_erasers', array($this, 'register_privacy_eraser'));
@@ -226,7 +227,14 @@ class PSV_Admin {
                 ? sanitize_text_field((string) $input['google_client_id'])
                 : '',
             'auto_detect' => empty($input['auto_detect']) ? 0 : 1,
+            'openai_api_key' => !empty($input['openai_api_key']) && is_scalar($input['openai_api_key']) ? sanitize_text_field((string) $input['openai_api_key']) : (get_option('psv_settings', array())['openai_api_key'] ?? ''),
         );
+    }
+
+    public function enqueue_admin_media($hook) {
+        if ('toplevel_page_psv-settings' === $hook) {
+            wp_enqueue_media();
+        }
     }
 
     public function page() {
@@ -280,6 +288,13 @@ class PSV_Admin {
                             </p>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row"><label for="psv-openai-key">Chave da API OpenAI</label></th>
+                        <td>
+                            <input id="psv-openai-key" class="regular-text" type="password" autocomplete="new-password" name="psv_settings[openai_api_key]" value="" placeholder="<?php echo !empty($options['openai_api_key']) ? esc_attr__('Chave configurada — informe outra para substituir', 'pdf-smart-viewer') : esc_attr__('Opcional', 'pdf-smart-viewer'); ?>">
+                            <p class="description">Opcional. A chave é armazenada no servidor e nunca é enviada ao navegador. O uso da API pode gerar custos na sua conta OpenAI. Deixe em branco para manter a chave atual.</p>
+                        </td>
+                    </tr>
                 </table>
 
                 <?php submit_button(__('Salvar configurações', 'pdf-smart-viewer')); ?>
@@ -287,27 +302,23 @@ class PSV_Admin {
 
             <hr>
 
-            <h2><?php echo esc_html__('Gerador de shortcode', 'pdf-smart-viewer'); ?></h2>
-            <p><?php echo esc_html__('Informe a URL do PDF e copie o shortcode gerado.', 'pdf-smart-viewer'); ?></p>
-
-            <p>
-                <input
-                    id="psv-shortcode-url"
-                    class="regular-text"
-                    type="url"
-                    placeholder="https://seusite.com/documento.pdf"
-                >
-                <button type="button" class="button" id="psv-generate">
-                    <?php echo esc_html__('Gerar shortcode', 'pdf-smart-viewer'); ?>
-                </button>
-            </p>
-
-            <input id="psv-shortcode-output" class="large-text code" readonly>
-
-            <p>
-                <?php echo esc_html__('Exemplo:', 'pdf-smart-viewer'); ?>
-                <code>[pdf_viewer url="https://seusite.com/documento.pdf" title="Visualizar PDF"]</code>
-            </p>
+            <h2><?php echo esc_html__('Gerador visual de shortcode', 'pdf-smart-viewer'); ?></h2>
+            <p><?php echo esc_html__('Selecione um PDF da biblioteca de mídia e configure os recursos sem escrever código.', 'pdf-smart-viewer'); ?></p>
+            <p><button type="button" class="button" id="psv-select-pdf"><?php echo esc_html__('Selecionar PDF da biblioteca', 'pdf-smart-viewer'); ?></button> <span id="psv-selected-pdf" aria-live="polite"></span></p>
+            <input type="hidden" id="psv-shortcode-url">
+            <table class="form-table"><tbody>
+                <tr><th><label for="psv-builder-title">Título do botão</label></th><td><input id="psv-builder-title" class="regular-text" value="Visualizar PDF"></td></tr>
+                <tr><th><label for="psv-builder-height">Altura do visualizador</label></th><td><input id="psv-builder-height" type="number" min="300" max="2000" value="700"> px</td></tr>
+                <tr><th>Recursos opcionais</th><td>
+                    <label><input type="checkbox" id="psv-builder-comments" checked> Comentários</label><br>
+                    <label><input type="checkbox" id="psv-builder-download" checked> Download</label><br>
+                    <label><input type="checkbox" id="psv-builder-ai" checked> Assistente de IA (requer chave configurada)</label><br>
+                    <label><input type="checkbox" id="psv-builder-qr" checked> QR Code</label>
+                </td></tr>
+            </tbody></table>
+            <p><button type="button" class="button button-primary" id="psv-generate"><?php echo esc_html__('Gerar shortcode', 'pdf-smart-viewer'); ?></button></p>
+            <input id="psv-shortcode-output" class="large-text code" readonly aria-label="Shortcode gerado">
+            <p><button type="button" class="button" id="psv-copy-shortcode"><?php echo esc_html__('Copiar shortcode', 'pdf-smart-viewer'); ?></button></p>
 
             <h2><?php echo esc_html__('Integrações', 'pdf-smart-viewer'); ?></h2>
             <p><strong><?php echo esc_html__('Shortcode:', 'pdf-smart-viewer'); ?></strong> <code>[pdf_viewer id="123"]</code></p>
@@ -323,26 +334,50 @@ class PSV_Admin {
         <script>
         (function () {
             'use strict';
-
-            var generateButton = document.getElementById('psv-generate');
+            var selectButton = document.getElementById('psv-select-pdf');
             var urlField = document.getElementById('psv-shortcode-url');
-            var outputField = document.getElementById('psv-shortcode-output');
-
-            if (!generateButton || !urlField || !outputField) {
-                return;
+            var output = document.getElementById('psv-shortcode-output');
+            var mediaFrame;
+            if (selectButton && window.wp && wp.media) {
+                selectButton.addEventListener('click', function () {
+                    if (!mediaFrame) {
+                        mediaFrame = wp.media({ title: 'Selecionar PDF', button: { text: 'Usar este PDF' }, library: { type: 'application/pdf' }, multiple: false });
+                        mediaFrame.on('select', function () {
+                            var item = mediaFrame.state().get('selection').first().toJSON();
+                            if (!item || !item.url || !/\.pdf(?:$|[?#])/i.test(item.url)) {
+                                window.alert('Selecione um arquivo PDF válido.');
+                                return;
+                            }
+                            urlField.value = item.url;
+                            document.getElementById('psv-selected-pdf').textContent = item.filename || item.url;
+                        });
+                    }
+                    mediaFrame.open();
+                });
             }
-
-            generateButton.addEventListener('click', function () {
+            var generate = document.getElementById('psv-generate');
+            if (generate) generate.addEventListener('click', function () {
                 var url = urlField.value.trim();
-
-                if (!url) {
-                    return;
+                if (!url) { window.alert('Selecione um PDF da biblioteca de mídia.'); return; }
+                var title = document.getElementById('psv-builder-title').value.trim() || 'Visualizar PDF';
+                var height = Math.min(2000, Math.max(300, parseInt(document.getElementById('psv-builder-height').value, 10) || 700));
+                var attrs = ['url="' + url.replace(/"/g, '&quot;') + '"', 'title="' + title.replace(/"/g, '&quot;') + '"', 'height="' + height + '"'];
+                attrs.push('comments="' + (document.getElementById('psv-builder-comments').checked ? 'yes' : 'no') + '"');
+                attrs.push('download="' + (document.getElementById('psv-builder-download').checked ? 'yes' : 'no') + '"');
+                attrs.push('ai="' + (document.getElementById('psv-builder-ai').checked ? 'yes' : 'no') + '"');
+                attrs.push('qrcode="' + (document.getElementById('psv-builder-qr').checked ? 'yes' : 'no') + '"');
+                output.value = '[pdf_viewer ' + attrs.join(' ') + ']';
+                output.select();
+            });
+            var copy = document.getElementById('psv-copy-shortcode');
+            if (copy) copy.addEventListener('click', function () {
+                if (!output.value) return;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(output.value);
+                } else {
+                    output.select();
+                    document.execCommand('copy');
                 }
-
-                outputField.value = '[pdf_viewer url="' +
-                    url.replace(/"/g, '&quot;') +
-                    '" title="Visualizar PDF"]';
-                outputField.select();
             });
         })();
         </script>
