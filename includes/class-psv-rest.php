@@ -38,7 +38,8 @@ class PSV_REST {
 
     public function get_comments($request) {
         global $wpdb;
-        $key = sanitize_text_field($request->get_param('key'));
+        $raw_key = $request->get_param('key');
+        $key = is_scalar($raw_key) ? sanitize_text_field((string) $raw_key) : '';
         if (!preg_match('/^[a-f0-9]{64}$/', $key)) {
             return new WP_Error('psv_key', __('Documento inválido.', 'pdf-smart-viewer'), array('status' => 400));
         }
@@ -81,13 +82,23 @@ class PSV_REST {
             return new WP_Error('psv_spam', __('Solicitação inválida.', 'pdf-smart-viewer'), array('status' => 400));
         }
 
-        $key = isset($data['key']) ? sanitize_text_field($data['key']) : '';
-        $url = isset($data['url']) ? esc_url_raw($data['url'], array('http', 'https')) : '';
-        $page = isset($data['page']) ? absint($data['page']) : 1;
-        $name = isset($data['name']) ? sanitize_text_field($data['name']) : '';
-        $email = isset($data['email']) ? sanitize_email($data['email']) : '';
-        $comment = isset($data['comment']) ? sanitize_textarea_field($data['comment']) : '';
-        $parent = isset($data['parent']) ? absint($data['parent']) : 0;
+        $key = isset($data['key']) && is_scalar($data['key'])
+            ? sanitize_text_field((string) $data['key'])
+            : '';
+        $url = isset($data['url']) && is_scalar($data['url'])
+            ? esc_url_raw((string) $data['url'], array('http', 'https'))
+            : '';
+        $page = isset($data['page']) && is_scalar($data['page']) ? absint($data['page']) : 1;
+        $name = isset($data['name']) && is_scalar($data['name'])
+            ? sanitize_text_field((string) $data['name'])
+            : '';
+        $email = isset($data['email']) && is_scalar($data['email'])
+            ? sanitize_email((string) $data['email'])
+            : '';
+        $comment = isset($data['comment']) && is_scalar($data['comment'])
+            ? sanitize_textarea_field((string) $data['comment'])
+            : '';
+        $parent = isset($data['parent']) && is_scalar($data['parent']) ? absint($data['parent']) : 0;
         $scheme = $url ? strtolower((string) wp_parse_url($url, PHP_URL_SCHEME)) : '';
 
         if (
