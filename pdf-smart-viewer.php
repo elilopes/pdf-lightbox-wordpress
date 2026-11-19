@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: PDF Smart Viewer
- * Description: Visualizador PDF em Lightbox com miniaturas, zoom, pesquisa, anotações locais, favoritos, histórico, comentários moderados e Google Drive.
+ * Description: Visualizador PDF com sumário, acessibilidade, IA opcional, QR Code, comentários, miniaturas e gerador visual de shortcode.
  * Version: 1.4.0
  * Author: PDF Smart Viewer
  * License: GPL-2.0-or-later
