@@ -47,7 +47,7 @@ O link compartilhado utiliza os parâmetros ?pdf=URL& page=N na URL atual; a pá
 Teste OAuth, CORS, cache e compatibilidade no ambiente de homologação antes de produção.
 
 == Privacidade ==
-O plugin armazena nome, e-mail, conteúdo do comentário, URL do documento, página, estado de moderação e data no banco de dados do site. O e-mail não é exibido publicamente. Um transient antispam temporário utiliza um hash do endereço IP por até 60 segundos. O plugin disponibiliza as ferramentas de exportação e exclusão de dados pessoais do WordPress.
+Ao desinstalar o plugin, os dados e configurações próprios do PDF Smart Viewer são removidos do banco de dados. O plugin armazena nome, e-mail, conteúdo do comentário, URL do documento, página, estado de moderação e data no banco de dados do site. O e-mail não é exibido publicamente. Um transient antispam temporário utiliza um hash do endereço IP por até 60 segundos. O plugin disponibiliza as ferramentas de exportação e exclusão de dados pessoais do WordPress.
 
 A integração opcional com Google Drive só carrega o serviço de autenticação quando o visitante escolhe essa função. O Google processa a autenticação e o envio conforme seus próprios termos. O PDF é processado no navegador; documentos hospedados em outro domínio precisam permitir CORS.
 
