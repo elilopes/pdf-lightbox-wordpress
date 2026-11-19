@@ -56,7 +56,6 @@ class PSV_REST {
             'args' => array(
                 'url' => array(
                     'required' => true,
-                    'sanitize_callback' => 'sanitize_text_field',
                 ),
             ),
         ));
