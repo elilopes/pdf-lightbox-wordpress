@@ -16,11 +16,11 @@ class PSV_Elementor {
     }
 
     public function register($manager) {
-        if (!did_action('elementor/loaded') || !class_exists('\\Elementor\\Widget_Base')) {
+        if (!did_action('elementor/loaded') || !class_exists('\Elementor\Widget_Base')) {
             return;
         }
 
-        $manager->register(new class extends \\Elementor\\Widget_Base {
+        $manager->register(new class extends \Elementor\Widget_Base {
             public function get_name() {
                 return 'psv_pdf_viewer';
             }
@@ -41,12 +41,12 @@ class PSV_Elementor {
                 $this->start_controls_section('content', array('label' => esc_html__('Documento', 'pdf-smart-viewer')));
                 $this->add_control('url', array(
                     'label' => esc_html__('URL do PDF', 'pdf-smart-viewer'),
-                    'type' => \\Elementor\\Controls_Manager::TEXT,
+                    'type' => \Elementor\Controls_Manager::TEXT,
                     'input_type' => 'url',
                 ));
                 $this->add_control('title', array(
                     'label' => esc_html__('Texto do botão', 'pdf-smart-viewer'),
-                    'type' => \\Elementor\\Controls_Manager::TEXT,
+                    'type' => \Elementor\Controls_Manager::TEXT,
                     'default' => 'Visualizar PDF',
                 ));
                 $this->end_controls_section();
