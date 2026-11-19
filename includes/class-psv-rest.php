@@ -49,6 +49,12 @@ class PSV_REST {
             'permission_callback' => '__return_true',
         ));
 
+        register_rest_route('psv/v1', '/ai', array(
+            'methods' => WP_REST_Server::CREATABLE,
+            'callback' => array($this, 'ai_assistant'),
+            'permission_callback' => '__return_true',
+        ));
+
         register_rest_route('psv/v1', '/document', array(
             'methods' => WP_REST_Server::READABLE,
             'callback' => array($this, 'get_document'),
@@ -90,6 +96,76 @@ class PSV_REST {
         $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
         $response->header('Pragma', 'no-cache');
         return $response;
+    }
+
+
+    /**
+     * Server-side AI proxy. The provider key is never exposed to the browser.
+     */
+    public function ai_assistant($request) {
+        $nonce = $request->get_header('X-WP-Nonce');
+        if (!$nonce || !wp_verify_nonce(sanitize_text_field($nonce), 'wp_rest')) {
+            return new WP_Error('psv_nonce', __('Código de segurança inválido. Atualize a página e tente novamente.', 'pdf-smart-viewer'), array('status' => 403));
+        }
+        $options = get_option('psv_settings', array());
+        $api_key = isset($options['openai_api_key']) ? trim((string) $options['openai_api_key']) : '';
+        if ('' === $api_key) {
+            return new WP_Error('psv_ai_disabled', __('O assistente de IA não está configurado pelo administrador.', 'pdf-smart-viewer'), array('status' => 503));
+        }
+        $ip = sanitize_text_field(wp_unslash(isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : 'unknown'));
+        $rate_key = 'psv_ai_rate_' . md5($ip);
+        if (get_transient($rate_key)) {
+            return new WP_Error('psv_ai_rate', __('Aguarde um minuto antes de fazer outra solicitação ao assistente.', 'pdf-smart-viewer'), array('status' => 429));
+        }
+        $data = $request->get_json_params();
+        if (!is_array($data)) {
+            return new WP_Error('psv_ai_invalid', __('Solicitação inválida.', 'pdf-smart-viewer'), array('status' => 400));
+        }
+        $action = isset($data['action']) && is_scalar($data['action']) ? sanitize_key($data['action']) : '';
+        $text = isset($data['text']) && is_scalar($data['text']) ? sanitize_textarea_field((string) $data['text']) : '';
+        $question = isset($data['question']) && is_scalar($data['question']) ? sanitize_text_field((string) $data['question']) : '';
+        $title = isset($data['title']) && is_scalar($data['title']) ? sanitize_text_field((string) $data['title']) : 'Documento PDF';
+        if (!in_array($action, array('summary', 'question', 'explain'), true) || '' === $text || strlen($text) > 24000) {
+            return new WP_Error('psv_ai_invalid', __('O conteúdo enviado é inválido ou excede o limite permitido.', 'pdf-smart-viewer'), array('status' => 400));
+        }
+        if ('summary' !== $action && ('' === $question || strlen($question) > 1000)) {
+            return new WP_Error('psv_ai_question', __('Informe uma pergunta ou termo com até 1.000 caracteres.', 'pdf-smart-viewer'), array('status' => 400));
+        }
+        $system = 'Você é um assistente de leitura de documentos. Responda em português usando somente o texto fornecido. Se a informação não estiver no documento, diga claramente que não foi encontrada. Não invente citações nem números de página.';
+        if ('summary' === $action) {
+            $prompt = 'Resuma o documento "' . $title . '", destacando objetivo, ideias centrais e conclusões.\n\nDOCUMENTO:\n' . $text;
+        } elseif ('explain' === $action) {
+            $prompt = 'Explique o termo "' . $question . '" no contexto deste documento.\n\nDOCUMENTO:\n' . $text;
+        } else {
+            $prompt = 'Responda à pergunta "' . $question . '" com base neste documento. Não invente informações.\n\nDOCUMENTO:\n' . $text;
+        }
+        $response = wp_remote_post('https://api.openai.com/v1/chat/completions', array(
+            'timeout' => 45,
+            'headers' => array('Authorization' => 'Bearer ' . $api_key, 'Content-Type' => 'application/json'),
+            'body' => wp_json_encode(array(
+                'model' => 'gpt-4o-mini',
+                'temperature' => 0.2,
+                'max_tokens' => 1200,
+                'messages' => array(
+                    array('role' => 'system', 'content' => $system),
+                    array('role' => 'user', 'content' => $prompt),
+                ),
+            )),
+        ));
+        if (is_wp_error($response)) {
+            return new WP_Error('psv_ai_connection', __('Não foi possível conectar ao serviço de IA.', 'pdf-smart-viewer'), array('status' => 502));
+        }
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+        if ($status < 200 || $status >= 300 || empty($body['choices'][0]['message']['content'])) {
+            error_log('[PDF Smart Viewer] AI provider returned HTTP ' . $status);
+            return new WP_Error('psv_ai_provider', __('O serviço de IA não conseguiu processar esta solicitação.', 'pdf-smart-viewer'), array('status' => 502));
+        }
+        set_transient($rate_key, 1, MINUTE_IN_SECONDS);
+        $result = sanitize_textarea_field($body['choices'][0]['message']['content']);
+        $rest_response = new WP_REST_Response(array('answer' => $result));
+        $rest_response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+        return $rest_response;
     }
 
     public function get_comments($request) {
