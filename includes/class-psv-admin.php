@@ -183,6 +183,10 @@ class PSV_Admin {
             'Se a integração com o Google Drive estiver configurada, o visitante poderá optar por conectar-se ao Google e enviar o PDF selecionado para sua própria conta do Drive. A conexão é iniciada somente pelo visitante e está sujeita às políticas de privacidade do Google. Os arquivos PDF são processados no navegador; arquivos hospedados em outro domínio precisam permitir CORS.',
             'pdf-smart-viewer'
         ) . '</p>';
+        $content .= '<p>' . esc_html__(
+            'Se o assistente de IA estiver habilitado pelo administrador, o texto extraído do PDF e a pergunta enviada pelo visitante serão encaminhados à API OpenAI para gerar resumo, explicação ou resposta. A utilização depende de uma chave configurada pelo responsável pelo site e está sujeita aos termos e políticas do provedor. Ao solicitar um QR Code, o endereço de compartilhamento do documento é enviado ao serviço externo api.qrserver.com para gerar a imagem.',
+            'pdf-smart-viewer'
+        ) . '</p>';
 
         wp_add_privacy_policy_content(
             __('PDF Smart Viewer', 'pdf-smart-viewer'),
