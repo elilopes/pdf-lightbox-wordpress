@@ -69,6 +69,13 @@
                         <button type="button" data-a="download">Baixar</button>
                         <button type="button" data-a="docx" title="Exportar o texto do PDF para Word">Exportar DOCX</button>
                         <button type="button" data-a="drive">Drive</button>
+                        <button type="button" data-a="theme" aria-pressed="false">Modo escuro</button>
+                        <button type="button" data-a="contrast" aria-pressed="false">Contraste</button>
+                        <button type="button" data-a="reader" aria-pressed="false">Modo de leitura</button>
+                        <button type="button" data-a="ai-summary" hidden>Resumir com IA</button>
+                        <button type="button" data-a="ai-question" hidden>Perguntar à IA</button>
+                        <button type="button" data-a="ai-explain" hidden>Explicar termo</button>
+                        <button type="button" data-a="qrcode" hidden>QR Code</button>
                         <button type="button" data-a="fullscreen">Tela cheia</button>
                         <button type="button" data-a="close" class="psv-close" aria-label="Fechar">×</button>
                     </div>
@@ -84,7 +91,9 @@
                     <aside class="psv-sidebar">
                         <h3>Páginas</h3>
                         <div class="psv-thumbs"></div>
-                        <h3>Marcadores</h3>
+                        <h3>Sumário do documento</h3>
+                        <nav class="psv-outline" aria-label="Sumário do documento"><p>Verificando marcadores…</p></nav>
+                        <h3>Favoritos pessoais</h3>
                         <div class="psv-bookmarks"></div>
                     </aside>
 
@@ -116,6 +125,22 @@
                     </aside>
                 </div>
 
+                <section class="psv-ai-panel" hidden aria-label="Assistente de IA">
+                    <div class="psv-ai-heading"><strong>Assistente do documento</strong><button type="button" data-a="ai-close" aria-label="Fechar assistente">×</button></div>
+                    <label for="psv-ai-question">Pergunta ou termo para explicar</label>
+                    <textarea id="psv-ai-question" rows="2" maxlength="1000"></textarea>
+                    <button type="button" data-a="ai-submit">Enviar pergunta</button>
+                    <p class="psv-ai-disclaimer">O texto do PDF será enviado ao serviço de IA configurado pelo administrador para gerar a resposta.</p>
+                    <div class="psv-ai-answer" aria-live="polite"></div>
+                </section>
+
+                <section class="psv-qr-panel" hidden aria-label="QR Code do documento">
+                    <div class="psv-ai-heading"><strong>QR Code para acessar este documento</strong><button type="button" data-a="qr-close" aria-label="Fechar QR Code">×</button></div>
+                    <img class="psv-qr-image" alt="QR Code de acesso ao documento" width="220" height="220">
+                    <p>O QR Code é gerado por um serviço externo. O endereço do documento será enviado a esse serviço.</p>
+                    <a class="psv-qr-open" target="_blank" rel="noopener noreferrer">Abrir imagem do QR Code para salvar</a>
+                </section>
+
                 <div class="psv-note-panel" hidden>
                     <label>Anotação particular desta página<textarea></textarea></label>
                     <button type="button" data-a="save-note">Salvar anotação</button>
@@ -139,15 +164,35 @@
         });
 
         modal.querySelector('.psv-tools').addEventListener('click', handleToolbarAction);
+        modal.querySelector('[data-a="ai-close"]').addEventListener('click', function () { modal.querySelector('.psv-ai-panel').hidden = true; });
+        modal.querySelector('[data-a="qr-close"]').addEventListener('click', function () { modal.querySelector('.psv-qr-panel').hidden = true; });
         modal.querySelector('.psv-comments').addEventListener('click', handleCommentPagination);
         modal.querySelector('[data-a="find"]').addEventListener('click', searchText);
         modal.querySelector('.psv-comment-form').addEventListener('submit', submitComment);
         modal.querySelector('[data-a="save-note"]').addEventListener('click', saveNote);
+        modal.querySelector('[data-a="ai-submit"]').addEventListener('click', function () {
+            const question = modal.querySelector('#psv-ai-question').value.trim();
+            if (question) runDocumentAI('question', question);
+        });
 
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && modal.classList.contains('is-open')) {
-                closeViewer();
+            if (!modal.classList.contains('is-open')) return;
+            if (event.key === 'Escape') { closeViewer(); return; }
+            if (event.target && /INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) return;
+            if (event.altKey || event.ctrlKey || event.metaKey) {
+                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+                    event.preventDefault();
+                    modal.querySelector('[data-a="search"]').click();
+                }
+                return;
             }
+            if (event.key === 'ArrowRight' || event.key === 'PageDown') { event.preventDefault(); modal.querySelector('[data-a="next"]').click(); }
+            else if (event.key === 'ArrowLeft' || event.key === 'PageUp') { event.preventDefault(); modal.querySelector('[data-a="prev"]').click(); }
+            else if (event.key === '+' || event.key === '=') { modal.querySelector('[data-a="plus"]').click(); }
+            else if (event.key === '-') { modal.querySelector('[data-a="minus"]').click(); }
+            else if (event.key.toLowerCase() === 'd') { modal.querySelector('[data-a="theme"]').click(); }
+            else if (event.key.toLowerCase() === 'c') { modal.querySelector('[data-a="contrast"]').click(); }
+            else if (event.key.toLowerCase() === 'r') { modal.querySelector('[data-a="reader"]').click(); }
         });
 
         return modal;
@@ -161,7 +206,9 @@
             key: data.psvKey || '',
             title: data.psvTitle || data.title || 'Visualizar PDF',
             comments: data.psvComments !== '0' && data.comments !== 'false',
-            download: data.psvDownload !== '0' && data.download !== 'false'
+            download: data.psvDownload !== '0' && data.download !== 'false',
+            ai: data.psvAi !== '0',
+            qrcode: data.psvQrcode !== '0'
         };
     }
 
@@ -278,6 +325,13 @@
         modal.querySelector('.psv-comment-pagination').hidden = true;
         modal.querySelector('[data-a="drive"]').hidden = !config.googleClientId;
         modal.querySelector('[data-a="download"]').hidden = !data.download;
+        ['ai-summary', 'ai-question', 'ai-explain'].forEach(function (action) {
+            modal.querySelector('[data-a="' + action + '"]').hidden = !(data.ai && config.aiEnabled);
+        });
+        modal.querySelector('[data-a="qrcode"]').hidden = !data.qrcode;
+        modal.querySelector('.psv-ai-panel').hidden = true;
+        modal.querySelector('.psv-qr-panel').hidden = true;
+        modal.querySelector('.psv-dialog').classList.remove('psv-reading-mode', 'psv-dark-mode', 'psv-high-contrast');
         modal.querySelector('.psv-status').hidden = false;
         modal.querySelector('.psv-status').textContent = config.strings?.loading || 'Carregando PDF…';
         modal.querySelector('.psv-canvas').hidden = true;
@@ -308,6 +362,7 @@
 
             await renderPage(currentSession);
             buildThumbnails(pdfDocument, currentSession);
+            buildDocumentOutline(pdfDocument, currentSession);
 
             if (data.comments) {
                 loadComments(currentSession, 1);
@@ -1152,6 +1207,117 @@
         }
     }
 
+
+    async function buildDocumentOutline(documentToRender, expectedSession) {
+        const container = getModal().querySelector('.psv-outline');
+        container.replaceChildren();
+        try {
+            const outlineItems = await documentToRender.getOutline();
+            if (expectedSession !== sessionId || documentToRender !== pdfDocument) return;
+            if (!outlineItems || !outlineItems.length) {
+                container.appendChild(createElement('p', '', 'Este PDF não possui marcadores internos.'));
+                return;
+            }
+            const buildLevel = function (items, parent) {
+                const list = createElement('ul', 'psv-outline-list');
+                items.forEach(function (item) {
+                    const li = createElement('li', 'psv-outline-item');
+                    const link = createElement('button', 'psv-outline-link', item.title || 'Seção sem título');
+                    link.type = 'button';
+                    link.addEventListener('click', async function () {
+                        try {
+                            let destination = item.dest;
+                            if (typeof destination === 'string') destination = await documentToRender.getDestination(destination);
+                            if (!destination || !destination[0]) return;
+                            const index = await documentToRender.getPageIndex(destination[0]);
+                            if (expectedSession !== sessionId || documentToRender !== pdfDocument) return;
+                            pageNumber = index + 1;
+                            await renderPage(expectedSession);
+                        } catch (error) {
+                            container.setAttribute('aria-label', 'Não foi possível abrir este marcador.');
+                        }
+                    });
+                    li.appendChild(link);
+                    if (item.items && item.items.length) {
+                        const toggle = createElement('button', 'psv-outline-toggle', '−');
+                        toggle.type = 'button';
+                        toggle.setAttribute('aria-expanded', 'true');
+                        const children = buildLevel(item.items, li);
+                        toggle.addEventListener('click', function () {
+                            const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                            toggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                            toggle.textContent = expanded ? '+' : '−';
+                            children.hidden = expanded;
+                        });
+                        li.insertBefore(toggle, link);
+                        li.appendChild(children);
+                    }
+                    list.appendChild(li);
+                });
+                parent.appendChild(list);
+                return list;
+            };
+            buildLevel(outlineItems, container);
+        } catch (error) {
+            container.textContent = 'Não foi possível carregar o sumário deste PDF.';
+        }
+    }
+
+    async function extractDocumentText(maxCharacters) {
+        if (!pdfDocument) throw new Error('Nenhum PDF está aberto.');
+        const chunks = [];
+        let total = 0;
+        for (let page = 1; page <= pdfDocument.numPages && total < maxCharacters; page += 1) {
+            const pageObject = await pdfDocument.getPage(page);
+            const content = await pageObject.getTextContent();
+            const text = content.items.map(function (item) { return item.str || ''; }).join(' ');
+            const remaining = maxCharacters - total;
+            chunks.push('Página ' + page + ': ' + text.slice(0, remaining));
+            total += Math.min(text.length, remaining);
+        }
+        if (!total) throw new Error('Não foi possível extrair texto. PDFs digitalizados podem precisar de OCR.');
+        return chunks.join('\n\n');
+    }
+
+    async function runDocumentAI(action, question) {
+        const modal = getModal();
+        const panel = modal.querySelector('.psv-ai-panel');
+        const output = modal.querySelector('.psv-ai-answer');
+        const currentSession = sessionId;
+        panel.hidden = false;
+        output.textContent = 'Lendo o documento e preparando a resposta…';
+        try {
+            const text = await extractDocumentText(24000);
+            const response = await fetch(config.restUrl + 'ai', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': config.nonce || '' },
+                body: JSON.stringify({ action: action, question: question || '', title: activeDocument ? activeDocument.title : 'Documento PDF', text: text })
+            });
+            const result = await parseApiResponse(response);
+            if (response.status === 403) {
+                await refreshRestNonce();
+                throw new Error('O código de segurança foi atualizado. Clique novamente para repetir a solicitação.');
+            }
+            if (!response.ok) throw new Error(apiErrorMessage(response.status, result));
+            if (currentSession === sessionId) output.textContent = result.answer || 'Não foi possível gerar uma resposta.';
+        } catch (error) {
+            if (currentSession === sessionId) output.textContent = error.message || 'Erro ao consultar o assistente.';
+        }
+    }
+
+    function showDocumentQr() {
+        if (!activeDocument) return;
+        const modal = getModal();
+        const panel = modal.querySelector('.psv-qr-panel');
+        const shareUrl = new URL(window.location.href);
+        shareUrl.searchParams.set('pdf', activeDocument.url);
+        shareUrl.searchParams.set('page', '1');
+        const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&format=png&data=' + encodeURIComponent(shareUrl.href);
+        modal.querySelector('.psv-qr-image').src = qrUrl;
+        modal.querySelector('.psv-qr-open').href = qrUrl;
+        panel.hidden = false;
+    }
+
     function handleToolbarAction(event) {
         const button = event.target.closest('[data-a]');
 
@@ -1286,6 +1452,45 @@
 
             case 'drive':
                 saveToDrive();
+                break;
+
+            case 'theme': {
+                const dialog = getModal().querySelector('.psv-dialog');
+                dialog.classList.toggle('psv-dark-mode');
+                button.setAttribute('aria-pressed', dialog.classList.contains('psv-dark-mode') ? 'true' : 'false');
+                break;
+            }
+
+            case 'contrast': {
+                const dialog = getModal().querySelector('.psv-dialog');
+                dialog.classList.toggle('psv-high-contrast');
+                button.setAttribute('aria-pressed', dialog.classList.contains('psv-high-contrast') ? 'true' : 'false');
+                break;
+            }
+
+            case 'reader': {
+                const dialog = getModal().querySelector('.psv-dialog');
+                dialog.classList.toggle('psv-reading-mode');
+                button.setAttribute('aria-pressed', dialog.classList.contains('psv-reading-mode') ? 'true' : 'false');
+                break;
+            }
+
+            case 'ai-summary':
+                runDocumentAI('summary', '');
+                break;
+
+            case 'ai-question':
+            case 'ai-explain': {
+                const panel = getModal().querySelector('.psv-ai-panel');
+                panel.hidden = false;
+                const field = panel.querySelector('textarea');
+                field.placeholder = button.dataset.a === 'ai-explain' ? 'Digite o termo que deseja explicar…' : 'Digite sua pergunta sobre o documento…';
+                field.focus();
+                break;
+            }
+
+            case 'qrcode':
+                showDocumentQr();
                 break;
         }
     }
