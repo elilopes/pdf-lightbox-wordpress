@@ -3,7 +3,7 @@ Contributors: pdfsmartviewer
 Tags: pdf, lightbox, viewer, google drive, comments
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 
 PDF Lightbox com miniaturas, zoom, busca, impressão, download, comentários públicos moderados, respostas, anotações particulares, favoritos, histórico, links para páginas e Google Drive.
@@ -47,6 +47,11 @@ O link compartilhado utiliza os parâmetros ?pdf=URL& page=N na URL atual; a pá
 Teste OAuth, CORS, cache e compatibilidade no ambiente de homologação antes de produção.
 
 == Changelog ==
+= 1.2.0 =
+* Exportação do texto dos PDFs para DOCX diretamente no Lightbox.
+* Respostas dos comentários recolhidas por padrão, com expansão individual.
+* Verificações de requisitos, arquivos essenciais e instalação da tabela; falhas de bootstrap e ativação são tratadas sem interromper o WordPress.
+
 = 1.1.0 =
 * Detecção automática de links PDF opcional.
 * Tag HTML customizada e integração por DIV.
