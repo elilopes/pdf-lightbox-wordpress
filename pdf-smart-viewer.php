@@ -55,6 +55,24 @@ if (!$psv_php_ok || !$psv_wp_ok) {
     return;
 }
 
+$psv_required_files = array(
+    'includes/class-psv-core.php',
+    'includes/class-psv-rest.php',
+    'includes/class-psv-admin.php',
+    'includes/class-psv-elementor.php',
+);
+
+foreach ($psv_required_files as $psv_relative_file) {
+    if (!is_readable(PSV_PATH . $psv_relative_file)) {
+        update_option(
+            'psv_bootstrap_error',
+            'Um ou mais arquivos essenciais do plugin estão ausentes ou sem permissão de leitura. Reinstale o plugin.',
+            false
+        );
+        return;
+    }
+}
+
 try {
     require_once PSV_PATH . 'includes/class-psv-core.php';
     require_once PSV_PATH . 'includes/class-psv-rest.php';
