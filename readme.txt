@@ -3,11 +3,11 @@ Contributors: pdfsmartviewer
 Tags: pdf, lightbox, viewer, google drive, comments
 Requires at least: 6.0
 Requires PHP: 7.4
-Stable tag: 1.3.0
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-PDF Lightbox com miniaturas, zoom, busca, impressão, download, comentários públicos moderados, respostas, anotações particulares, favoritos, histórico, links para páginas e Google Drive.
+PDF Lightbox com sumário por marcadores, acessibilidade, modo de leitura, assistente de IA opcional, QR Code, gerador visual de shortcode, miniaturas, zoom, busca, comentários moderados, anotações, favoritos, histórico e Google Drive.
 
 == Instalação ==
 Instale o ZIP em Plugins > Adicionar novo > Enviar plugin e ative.
@@ -36,6 +36,12 @@ Ative Google Drive API no Google Cloud, configure OAuth Client ID Web, adicione 
 Comentários públicos são moderados no painel. O nome é exibido; o e-mail não. Há limitação simples de frequência por IP. Respostas também passam por moderação.
 
 == Recursos ==
+Sumário inteligente: identifica marcadores internos (bookmarks/outlines) do PDF e cria navegação hierárquica por capítulos e seções. PDFs sem marcadores exibem uma mensagem informativa.
+Acessibilidade: modo escuro, alto contraste, foco visível e atalhos de teclado (setas/PgUp/PgDn para páginas, +/- para zoom, Ctrl/Cmd+F para busca, D para modo escuro, C para contraste, R para modo de leitura, Esc para fechar).
+Modo de leitura: oculta painéis e controles secundários para ampliar a área de leitura; o botão de alternância e o botão fechar permanecem disponíveis.
+Assistente de IA opcional: resumo, explicação de termos e perguntas sobre o documento. Requer chave OpenAI configurada em PDF Smart Viewer > configurações. O texto extraído no navegador é enviado ao serviço OpenAI; PDFs digitalizados precisam de OCR. Há limite de 24.000 caracteres por solicitação e limitação de uma solicitação por IP a cada minuto.
+QR Code opcional: cria código de acesso por meio do serviço externo api.qrserver.com. O endereço do documento é enviado a esse serviço; use somente com documentos cujo compartilhamento por URL seja apropriado.
+Gerador visual de shortcode: seleciona PDF da biblioteca de mídia, configura altura, comentários, download, IA e QR Code e gera shortcode copiável.
 Miniaturas reais, zoom, navegação, rotação, busca textual, download, impressão, tela cheia, favoritos, marcadores, anotações locais, histórico local, link compartilhável de página, comentários e respostas.
 
 == Limitações e observações ==
@@ -53,6 +59,13 @@ Ao desinstalar o plugin, os dados e configurações próprios do PDF Smart Viewe
 A integração opcional com Google Drive só carrega o serviço de autenticação quando o visitante escolhe essa função. O Google processa a autenticação e o envio conforme seus próprios termos. O PDF é processado no navegador; documentos hospedados em outro domínio precisam permitir CORS.
 
 == Changelog ==
+= 1.4.0 =
+* Sumário hierárquico com navegação por marcadores internos do PDF.
+* Modo escuro, alto contraste, atalhos de teclado e modo de leitura.
+* Assistente de IA opcional com proxy server-side, chave não exposta ao navegador, limite de conteúdo e rate limiting.
+* QR Code opcional para compartilhamento rápido, com aviso sobre serviço externo.
+* Gerador visual de shortcode com seleção de PDF na biblioteca de mídia e configuração de recursos e altura.
+
 = 1.3.0 =
 * Integração com as ferramentas de exportação e exclusão de dados pessoais do WordPress.
 * Inclusão das informações de privacidade e tratamento de dados.
