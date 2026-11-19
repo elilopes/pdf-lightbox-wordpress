@@ -4,7 +4,8 @@ Tags: pdf, lightbox, viewer, google drive, comments
 Requires at least: 6.0
 Requires PHP: 7.4
 Stable tag: 1.3.0
-License: GPLv2 or later\nLicense URI: https://www.gnu.org/licenses/gpl-2.0.html
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 PDF Lightbox com miniaturas, zoom, busca, impressão, download, comentários públicos moderados, respostas, anotações particulares, favoritos, histórico, links para páginas e Google Drive.
 
@@ -52,7 +53,15 @@ Ao desinstalar o plugin, os dados e configurações próprios do PDF Smart Viewe
 A integração opcional com Google Drive só carrega o serviço de autenticação quando o visitante escolhe essa função. O Google processa a autenticação e o envio conforme seus próprios termos. O PDF é processado no navegador; documentos hospedados em outro domínio precisam permitir CORS.
 
 == Changelog ==
-= 1.3.0 =\n* Integração com as ferramentas de exportação e exclusão de dados pessoais do WordPress.\n* Inclusão das informações de privacidade e tratamento de dados.\n* Respostas limitadas a comentários principais, impedindo encadeamento ilimitado.\n* Limite de segurança na resposta da API e tratamento explícito de erros de banco de dados.\n* Carregamento dos recursos do painel administrativo somente no wp-admin.\n* Detecção de elementos HTML personalizados para carregamento condicional dos recursos.\n\n= 1.2.0 =
+= 1.3.0 =
+* Integração com as ferramentas de exportação e exclusão de dados pessoais do WordPress.
+* Inclusão das informações de privacidade e tratamento de dados.
+* Respostas limitadas a comentários principais, impedindo encadeamento ilimitado.
+* Limite de segurança na resposta da API e tratamento explícito de erros de banco de dados.
+* Carregamento dos recursos do painel administrativo somente no wp-admin.
+* Detecção de elementos HTML personalizados para carregamento condicional dos recursos.
+
+= 1.2.0 =
 * Exportação do texto dos PDFs para DOCX diretamente no Lightbox.
 * Respostas dos comentários recolhidas por padrão, com expansão individual.
 * Verificações de requisitos, arquivos essenciais e instalação da tabela; falhas de bootstrap e ativação são tratadas sem interromper o WordPress.
