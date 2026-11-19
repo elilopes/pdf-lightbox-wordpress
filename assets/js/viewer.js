@@ -60,6 +60,7 @@
                         <button type="button" data-a="plus" aria-label="Aumentar zoom">+</button>
                         <button type="button" data-a="fit">Ajustar</button>
                         <button type="button" data-a="rotate">↻</button>
+                        <button type="button" data-a="outline" aria-expanded="true">Sumário</button>
                         <button type="button" data-a="search">Buscar</button>
                         <button type="button" data-a="comments" aria-expanded="false">Comentários</button>
                         <button type="button" data-a="bookmark">☆ Favoritar</button>
@@ -1376,6 +1377,13 @@
                 panel.hidden = !panel.hidden;
                 toggle.textContent = panel.hidden ? 'Comentários' : 'Fechar comentários';
                 toggle.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+                break;
+            }
+
+            case 'outline': {
+                const dialog = getModal().querySelector('.psv-dialog');
+                dialog.classList.toggle('psv-show-sidebar');
+                button.setAttribute('aria-expanded', dialog.classList.contains('psv-show-sidebar') ? 'true' : 'false');
                 break;
             }
 
