@@ -19,6 +19,8 @@
     let sessionId = 0;
     let renderId = 0;
     let searchCursor = null;
+    let commentPage = 1;
+    let commentTotalPages = 1;
 
     const createElement = function (tagName, className, text) {
         const node = document.createElement(tagName);
@@ -195,6 +197,7 @@
                         <button type="button" data-a="fit">Ajustar</button>
                         <button type="button" data-a="rotate">↻</button>
                         <button type="button" data-a="search">Buscar</button>
+                        <button type="button" data-a="comments" aria-expanded="false">Comentários</button>
                         <button type="button" data-a="bookmark">☆ Favoritar</button>
                         <button type="button" data-a="note">Anotação</button>
                         <button type="button" data-a="share">Compartilhar página</button>
@@ -225,9 +228,14 @@
                         <canvas class="psv-canvas" hidden></canvas>
                     </main>
 
-                    <aside class="psv-comments">
+                    <aside class="psv-comments" hidden>
                         <h3>Comentários</h3>
                         <div class="psv-comment-list"></div>
+                        <div class="psv-comment-pagination" hidden>
+                            <button type="button" data-a="comments-prev">Anterior</button>
+                            <span aria-live="polite"></span>
+                            <button type="button" data-a="comments-next">Próxima</button>
+                        </div>
                         <div class="psv-reply-context" hidden>
                             Respondendo a <strong></strong>
                             <button type="button" data-a="cancel-reply">Cancelar</button>
@@ -265,6 +273,7 @@
         });
 
         modal.querySelector('.psv-tools').addEventListener('click', handleToolbarAction);
+        modal.querySelector('.psv-comments').addEventListener('click', handleCommentPagination);
         modal.querySelector('[data-a="find"]').addEventListener('click', searchText);
         modal.querySelector('.psv-comment-form').addEventListener('submit', submitComment);
         modal.querySelector('[data-a="save-note"]').addEventListener('click', saveNote);
@@ -292,13 +301,16 @@
 
     function normalizeDocumentUrl(value) {
         const trimmed = String(value || '').trim();
+        const parsed = new URL(trimmed, window.location.href);
 
-        if (/^https?:\/\//i.test(trimmed)) {
-            // Keep absolute shortcode URLs byte-for-byte: PHP generated the matching key.
-            return trimmed;
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+            throw new Error('Protocolo de PDF inválido.');
         }
 
-        return new URL(trimmed, window.location.href).href;
+        // URL.href canonicalizes host casing, default ports, spaces, Unicode and query encoding.
+        return parsed.href.replace(/%[0-9a-f]{2}/gi, function (escape) {
+            return escape.toUpperCase();
+        });
     }
 
     function cancelCurrentDocument() {
@@ -377,7 +389,15 @@
         document.body.classList.add('psv-lock');
 
         modal.querySelector('.psv-doc-title').textContent = data.title;
-        modal.querySelector('.psv-comments').hidden = !data.comments;
+        const commentsPanel = modal.querySelector('.psv-comments');
+        const commentsToggle = modal.querySelector('[data-a="comments"]');
+        commentsPanel.hidden = true;
+        commentsToggle.hidden = !data.comments;
+        commentsToggle.textContent = 'Comentários';
+        commentsToggle.setAttribute('aria-expanded', 'false');
+        commentPage = 1;
+        commentTotalPages = 1;
+        modal.querySelector('.psv-comment-pagination').hidden = true;
         modal.querySelector('[data-a="drive"]').hidden = !config.googleClientId;
         modal.querySelector('[data-a="download"]').hidden = !data.download;
         modal.querySelector('.psv-status').hidden = false;
@@ -412,7 +432,7 @@
             buildThumbnails(pdfDocument, currentSession);
 
             if (data.comments) {
-                loadComments(currentSession);
+                loadComments(currentSession, 1);
             }
         } catch (error) {
             if (currentSession !== sessionId) {
@@ -711,64 +731,131 @@
         panel.querySelector('span').textContent = 'Anotação salva neste navegador.';
     }
 
-    async function loadComments(expectedSession) {
-        const list = getModal().querySelector('.psv-comment-list');
-        list.textContent = 'Carregando…';
+    async function loadComments(expectedSession, requestedPage) {
+        const modal = getModal();
+        const list = modal.querySelector('.psv-comment-list');
+        const pagination = modal.querySelector('.psv-comment-pagination');
+        const pageToLoad = Math.max(1, Number(requestedPage) || 1);
+        list.textContent = 'Carregando comentários…';
+        pagination.hidden = true;
 
         try {
             const response = await fetch(
-                config.restUrl + 'comments?key=' + encodeURIComponent(activeDocument.key)
+                config.restUrl + 'comments?key=' + encodeURIComponent(activeDocument.key) +
+                '&page=' + pageToLoad + '&per_page=20',
+                { headers: { Accept: 'application/json' }, cache: 'no-store' }
             );
-            const rows = await response.json();
+            const result = await parseApiResponse(response);
 
             if (expectedSession !== sessionId) {
                 return;
             }
+            if (!response.ok) {
+                throw new Error(apiErrorMessage(response.status, result));
+            }
 
+            const rows = result && Array.isArray(result.comments) ? result.comments : null;
+            if (!rows) {
+                throw new Error('O WordPress retornou uma resposta inesperada ao carregar os comentários.');
+            }
+
+            commentPage = Number(result.page) || pageToLoad;
+            commentTotalPages = Number(result.total_pages) || 1;
             list.replaceChildren();
 
-            if (!Array.isArray(rows) || !rows.length) {
-                list.textContent = 'Nenhum comentário publicado.';
-                return;
+            const roots = rows.filter(function (row) {
+                return !Number(row.parent_id);
+            });
+
+            if (!roots.length) {
+                list.textContent = 'Nenhum comentário publicado nesta página.';
+            } else {
+                roots.forEach(function (row) {
+                    const item = createElement('article', 'psv-comment');
+                    const author = createElement('b', '', row.author_name + ' · pág. ' + row.page_number);
+                    const text = createElement('p', '', row.comment_text);
+                    const reply = createElement('button', 'psv-reply', 'Responder');
+
+                    reply.type = 'button';
+                    reply.addEventListener('click', function () {
+                        setReply(row);
+                    });
+                    item.append(author, text, reply);
+
+                    rows.filter(function (child) {
+                        return Number(child.parent_id) === Number(row.id);
+                    }).forEach(function (child) {
+                        const replyItem = createElement('div', 'psv-reply-item');
+                        replyItem.append(
+                            createElement('b', '', child.author_name + ' respondeu'),
+                            createElement('p', '', child.comment_text)
+                        );
+                        item.appendChild(replyItem);
+                    });
+                    list.appendChild(item);
+                });
             }
 
-            rows.filter(function (row) {
-                return !Number(row.parent_id);
-            }).forEach(function (row) {
-                const item = createElement('article', 'psv-comment');
-                const author = createElement(
-                    'b',
-                    '',
-                    row.author_name + ' · pág. ' + row.page_number
-                );
-                const text = createElement('p', '', row.comment_text);
-                const reply = createElement('button', 'psv-reply', 'Responder');
-
-                reply.type = 'button';
-                reply.addEventListener('click', function () {
-                    setReply(row);
-                });
-
-                item.append(author, text, reply);
-
-                rows.filter(function (child) {
-                    return Number(child.parent_id) === Number(row.id);
-                }).forEach(function (child) {
-                    const replyItem = createElement('div', 'psv-reply-item');
-                    replyItem.append(
-                        createElement('b', '', child.author_name + ' respondeu'),
-                        createElement('p', '', child.comment_text)
-                    );
-                    item.appendChild(replyItem);
-                });
-
-                list.appendChild(item);
-            });
+            const previous = pagination.querySelector('[data-a="comments-prev"]');
+            const next = pagination.querySelector('[data-a="comments-next"]');
+            pagination.querySelector('span').textContent =
+                'Página ' + commentPage + ' de ' + commentTotalPages;
+            previous.disabled = !result.has_previous;
+            next.disabled = !result.has_more;
+            pagination.hidden = commentTotalPages <= 1;
         } catch (error) {
             if (expectedSession === sessionId) {
-                list.textContent = 'Erro ao carregar comentários.';
+                list.textContent = error.message || 'Não foi possível carregar os comentários.';
             }
         }
+    }
+
+    function handleCommentPagination(event) {
+        const button = event.target.closest('[data-a]');
+        if (!button || !activeDocument) {
+            return;
+        }
+
+        if (button.dataset.a === 'comments-prev' && commentPage > 1) {
+            loadComments(sessionId, commentPage - 1);
+        } else if (button.dataset.a === 'comments-next' && commentPage < commentTotalPages) {
+            loadComments(sessionId, commentPage + 1);
+        }
+    }
+
+    async function parseApiResponse(response) {
+        const raw = await response.text();
+        if (!raw) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            if (!response.ok) {
+                return { message: 'O servidor retornou um erro HTTP ' + response.status + '.' };
+            }
+            throw new Error('O WordPress retornou uma resposta inválida. Verifique a API REST.');
+        }
+    }
+
+    function apiErrorMessage(status, result) {
+        if (result && result.message) {
+            return result.message;
+        }
+        if (status === 400) {
+            return 'A solicitação de comentários é inválida.';
+        }
+        if (status === 403) {
+            return 'A sessão de segurança expirou. Atualize o código de segurança e tente novamente.';
+        }
+        if (status === 404) {
+            return 'A API de comentários não foi encontrada. Verifique se o plugin está ativo.';
+        }
+        if (status >= 500) {
+            return 'O servidor encontrou um erro ao consultar os comentários. Tente novamente mais tarde.';
+        }
+        return 'Não foi possível carregar os comentários (HTTP ' + status + ').';
     }
 
     function setReply(comment) {
@@ -800,6 +887,43 @@
         context.querySelector('strong').textContent = '';
     }
 
+    async function refreshRestNonce() {
+        const response = await fetch(
+            config.restUrl + 'nonce?_=' + Date.now(),
+            { headers: { Accept: 'application/json' }, cache: 'no-store' }
+        );
+        const result = await parseApiResponse(response);
+
+        if (!response.ok || !result.nonce) {
+            throw new Error('Não foi possível renovar o código de segurança. Verifique sua conexão e tente novamente.');
+        }
+
+        config.nonce = result.nonce;
+        return result.nonce;
+    }
+
+    async function postComment(payload, retryAfterNonce) {
+        const response = await fetch(config.restUrl + 'comments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': config.nonce || ''
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await parseApiResponse(response);
+
+        if (response.status === 403 && retryAfterNonce) {
+            await refreshRestNonce();
+            return postComment(payload, false);
+        }
+
+        if (!response.ok) {
+            throw new Error(apiErrorMessage(response.status, result));
+        }
+        return result;
+    }
+
     async function submitComment(event) {
         event.preventDefault();
 
@@ -808,32 +932,26 @@
         const button = form.querySelector('button[type="submit"]');
         const currentSession = sessionId;
 
+        if (!activeDocument) {
+            window.alert('Abra um documento antes de enviar comentários.');
+            return;
+        }
+
+        const payload = {
+            key: activeDocument.key,
+            url: activeDocument.url,
+            page: pageNumber,
+            name: formData.get('name'),
+            email: formData.get('email'),
+            comment: formData.get('comment'),
+            website: formData.get('website'),
+            parent: form.dataset.parent || 0
+        };
+
         button.disabled = true;
 
         try {
-            const response = await fetch(config.restUrl + 'comments', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-WP-Nonce': config.nonce || ''
-                },
-                body: JSON.stringify({
-                    key: activeDocument.key,
-                    url: activeDocument.url,
-                    page: pageNumber,
-                    name: formData.get('name'),
-                    email: formData.get('email'),
-                    comment: formData.get('comment'),
-                    website: formData.get('website'),
-                    parent: form.dataset.parent || 0
-                })
-            });
-            const result = await response.json();
-
-            if (!response.ok) {
-                throw new Error(result.message || 'Falha ao enviar comentário.');
-            }
-
+            const result = await postComment(payload, true);
             if (currentSession !== sessionId) {
                 return;
             }
@@ -843,7 +961,10 @@
             window.alert(result.message || 'Comentário enviado para moderação.');
         } catch (error) {
             if (currentSession === sessionId) {
-                window.alert(error.message);
+                const message = error instanceof TypeError
+                    ? 'Falha de conexão ao enviar o comentário. Verifique sua internet e tente novamente.'
+                    : (error.message || 'Não foi possível enviar o comentário.');
+                window.alert(message);
             }
         } finally {
             button.disabled = false;
@@ -956,6 +1077,15 @@
                 rotation = (rotation + 90) % 360;
                 renderPage();
                 break;
+
+            case 'comments': {
+                const panel = getModal().querySelector('.psv-comments');
+                const toggle = getModal().querySelector('[data-a="comments"]');
+                panel.hidden = !panel.hidden;
+                toggle.textContent = panel.hidden ? 'Comentários' : 'Fechar comentários';
+                toggle.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+                break;
+            }
 
             case 'search': {
                 const searchBar = getModal().querySelector('.psv-searchbar');
