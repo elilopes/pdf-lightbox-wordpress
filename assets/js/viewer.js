@@ -172,7 +172,8 @@
         modal.querySelector('[data-a="save-note"]').addEventListener('click', saveNote);
         modal.querySelector('[data-a="ai-submit"]').addEventListener('click', function () {
             const question = modal.querySelector('#psv-ai-question').value.trim();
-            if (question) runDocumentAI('question', question);
+            const aiAction = modal.querySelector('[data-a="ai-submit"]').dataset.aiAction || 'question';
+            if (question) runDocumentAI(aiAction, question);
         });
 
         document.addEventListener('keydown', function (event) {
@@ -208,7 +209,8 @@
             comments: data.psvComments !== '0' && data.comments !== 'false',
             download: data.psvDownload !== '0' && data.download !== 'false',
             ai: data.psvAi !== '0',
-            qrcode: data.psvQrcode !== '0'
+            qrcode: data.psvQrcode !== '0',
+            height: Math.min(2000, Math.max(300, parseInt(data.psvHeight, 10) || 700))
         };
     }
 
@@ -314,6 +316,8 @@
         document.body.classList.add('psv-lock');
 
         modal.querySelector('.psv-doc-title').textContent = data.title;
+        modal.querySelector('.psv-dialog').style.height = data.height + 'px';
+        modal.querySelector('.psv-dialog').style.maxHeight = '96vh';
         const commentsPanel = modal.querySelector('.psv-comments');
         const commentsToggle = modal.querySelector('[data-a="comments"]');
         commentsPanel.hidden = true;
@@ -1485,6 +1489,7 @@
                 panel.hidden = false;
                 const field = panel.querySelector('textarea');
                 field.placeholder = button.dataset.a === 'ai-explain' ? 'Digite o termo que deseja explicar…' : 'Digite sua pergunta sobre o documento…';
+                panel.querySelector('[data-a="ai-submit"]').dataset.aiAction = button.dataset.a === 'ai-explain' ? 'explain' : 'question';
                 field.focus();
                 break;
             }
