@@ -1,6 +1,6 @@
 # PDF Smart Viewer
 
-WordPress plugin that displays PDF documents in a responsive Lightbox with page navigation, thumbnails, text search, comments with moderation, private notes, bookmarks, history, and optional Google Drive integration.
+WordPress plugin that displays PDF documents in a responsive Lightbox with page navigation, thumbnails, text search, comments with moderation, private notes, bookmarks, history, document outlines, accessibility modes, optional AI assistance, QR codes, and a visual shortcode builder.
 
 ## Requirements
 
@@ -30,11 +30,19 @@ See [readme.txt](readme.txt) for setup details, privacy information, and feature
 - `assets/css/viewer.css`: frontend styling.
 - `uninstall.php`: removes plugin options, temporary rate-limit records, and plugin comment table when the plugin is uninstalled.
 
+## Features added in 1.4.0
+
+- Hierarchical PDF outline navigation using embedded bookmarks.
+- Dark mode, high contrast, keyboard shortcuts, and distraction-free reading mode.
+- Optional OpenAI assistant (summary, term explanation, document Q&A) through a server-side proxy. The API key is not localized to frontend JavaScript; requests are limited by size and IP rate limiting.
+- Optional QR generation via the external QR Server API. The document URL is sent to that provider only when the reader requests a QR code.
+- Visual shortcode builder with WordPress Media Library selection and per-viewer settings.
+
 ## Privacy and external services
 
 The plugin stores commenter names, email addresses, comment text, document URLs, page numbers, moderation state, and timestamps in the WordPress database. The email address is not displayed publicly. WordPress personal-data export and erasure tools are supported.
 
-PDF.js is currently loaded from a version-pinned CDN and its worker is loaded from the same provider. This is a known WordPress.org directory-readiness issue: non-service JavaScript and CSS dependencies should be bundled locally with their license and attribution. The optional Google Identity Services and Google Drive API are loaded/used only when a visitor explicitly chooses the Drive action and the site administrator has configured a Client ID.
+PDF.js is currently loaded from a version-pinned CDN and its worker is loaded from the same provider. This is a known WordPress.org directory-readiness issue: non-service JavaScript and CSS dependencies should be bundled locally with their license and attribution. When AI is enabled, extracted document text (up to 24,000 characters per request) is sent to the configured OpenAI API account. Administrators should disclose this processing and review the provider's data terms. QR generation uses api.qrserver.com and sends the share URL only after the QR action is selected. The optional Google Identity Services and Google Drive API are loaded/used only when a visitor explicitly chooses the Drive action and the site administrator has configured a Client ID.
 
 ## Development and validation
 
