@@ -54,7 +54,7 @@ class PSV_Elementor {
 
             protected function render() {
                 $settings = $this->get_settings_for_display();
-                $url = isset($settings['url']) ? esc_url_raw($settings['url'], array('http', 'https')) : '';
+                $url = isset($settings['url']) ? PSV_Core::normalize_url($settings['url']) : '';
                 $title = isset($settings['title']) ? sanitize_text_field($settings['title']) : 'Visualizar PDF';
                 echo do_shortcode('[pdf_viewer url="' . esc_url($url) . '" title="' . esc_attr($title) . '"]');
             }
