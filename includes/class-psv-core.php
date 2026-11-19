@@ -119,7 +119,10 @@ final class PSV_Core {
         wp_enqueue_style('psv-viewer');
         wp_enqueue_script('psv-pdfjs');
         wp_enqueue_script('psv-viewer');
-        wp_enqueue_script('google-identity', 'https://accounts.google.com/gsi/client', array(), null, true);
+        $options = get_option('psv_settings', array());
+        if (!empty($options['google_client_id'])) {
+            wp_enqueue_script('google-identity', 'https://accounts.google.com/gsi/client', array(), null, true);
+        }
     }
 
     private function pdf_url($url) {
