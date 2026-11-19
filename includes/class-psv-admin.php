@@ -18,6 +18,141 @@ class PSV_Admin {
         add_action('admin_menu', array($this, 'menu'));
         add_action('admin_init', array($this, 'settings'));
         add_action('admin_post_psv_moderate', array($this, 'moderate'));
+        add_filter('wp_privacy_personal_data_exporters', array($this, 'register_privacy_exporter'));
+        add_filter('wp_privacy_personal_data_erasers', array($this, 'register_privacy_eraser'));
+        add_action('admin_init', array($this, 'add_privacy_policy_content'));
+    }
+
+    /**
+     * Register the plugin's personal-data exporter with WordPress privacy tools.
+     */
+    public function register_privacy_exporter($exporters) {
+        $exporters['pdf-smart-viewer'] = array(
+            'exporter_friendly_name' => __('PDF Smart Viewer comments', 'pdf-smart-viewer'),
+            'callback' => array($this, 'export_personal_data'),
+        );
+        return $exporters;
+    }
+
+    /**
+     * Export comments associated with the supplied email address in batches.
+     */
+    public function export_personal_data($email_address, $page = 1) {
+        global $wpdb;
+
+        $email_address = sanitize_email($email_address);
+        $page = max(1, absint($page));
+        $per_page = 50;
+        $table = PSV_Core::table();
+        $rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT document_url, page_number, author_name, author_email, comment_text, status, created_at
+                FROM {$table}
+                WHERE author_email = %s
+                ORDER BY id ASC
+                LIMIT %d OFFSET %d",
+                $email_address,
+                $per_page,
+                ($page - 1) * $per_page
+            ),
+            ARRAY_A
+        );
+
+        $data = array();
+        foreach ((array) $rows as $row) {
+            $data[] = array(
+                'group_id' => 'pdf-smart-viewer-comments',
+                'group_label' => __('PDF Smart Viewer comments', 'pdf-smart-viewer'),
+                'item_id' => 'psv-comment-' . md5($email_address . '|' . $row['created_at'] . '|' . $row['document_url']),
+                'data' => array(
+                    array('name' => __('Document URL', 'pdf-smart-viewer'), 'value' => $row['document_url']),
+                    array('name' => __('Page', 'pdf-smart-viewer'), 'value' => (string) $row['page_number']),
+                    array('name' => __('Name', 'pdf-smart-viewer'), 'value' => $row['author_name']),
+                    array('name' => __('Email', 'pdf-smart-viewer'), 'value' => $row['author_email']),
+                    array('name' => __('Comment', 'pdf-smart-viewer'), 'value' => $row['comment_text']),
+                    array('name' => __('Moderation status', 'pdf-smart-viewer'), 'value' => $row['status']),
+                    array('name' => __('Date', 'pdf-smart-viewer'), 'value' => $row['created_at']),
+                ),
+            );
+        }
+
+        return array(
+            'data' => $data,
+            'done' => count($rows) < $per_page,
+        );
+    }
+
+    /**
+     * Register the plugin's personal-data eraser with WordPress privacy tools.
+     */
+    public function register_privacy_eraser($erasers) {
+        $erasers['pdf-smart-viewer'] = array(
+            'eraser_friendly_name' => __('PDF Smart Viewer comments', 'pdf-smart-viewer'),
+            'callback' => array($this, 'erase_personal_data'),
+        );
+        return $erasers;
+    }
+
+    /**
+     * Remove comments belonging to an email address and detach surviving replies.
+     */
+    public function erase_personal_data($email_address, $page = 1) {
+        global $wpdb;
+
+        $email_address = sanitize_email($email_address);
+        $table = PSV_Core::table();
+        $root_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT id FROM {$table} WHERE author_email = %s AND parent_id = 0",
+                $email_address
+            )
+        );
+
+        if ($root_ids) {
+            $root_ids = array_map('absint', $root_ids);
+            $id_list = implode(',', $root_ids);
+            $wpdb->query("UPDATE {$table} SET parent_id = 0 WHERE parent_id IN ({$id_list})");
+        }
+
+        $removed = $wpdb->delete($table, array('author_email' => $email_address), array('%s'));
+        if (false === $removed) {
+            return array(
+                'items_removed' => false,
+                'items_retained' => true,
+                'messages' => array(__('Não foi possível excluir todos os comentários deste endereço de e-mail.', 'pdf-smart-viewer')),
+                'done' => true,
+            );
+        }
+
+        return array(
+            'items_removed' => $removed > 0,
+            'items_retained' => false,
+            'messages' => array(),
+            'done' => true,
+        );
+    }
+
+    /**
+     * Explain the personal data and external services used by this plugin.
+     */
+    public function add_privacy_policy_content() {
+        if (!function_exists('wp_add_privacy_policy_content')) {
+            return;
+        }
+
+        $content = '<p>' . esc_html__(
+            'PDF Smart Viewer stores the name, email address, comment text, document URL, page number, moderation status and submission date for comments submitted by visitors. The email address is used for moderation and is not displayed publicly. A one-minute anti-spam rate-limit transient is generated from the visitor IP address. Comment records are stored in this site database until an administrator deletes them or the site owner removes them.',
+            'pdf-smart-viewer'
+        ) . '</p>';
+        $content .= '<p>' . esc_html__(
+            'If Google Drive integration is configured, the visitor may choose to connect to Google and upload the selected PDF to their own Drive account. This connection is initiated only by the visitor and is subject to Google privacy terms. PDF files are processed in the visitor browser; files hosted on another domain must permit CORS.',
+            'pdf-smart-viewer'
+        ) . '</p>';
+
+        wp_add_privacy_policy_content(
+            __('PDF Smart Viewer', 'pdf-smart-viewer'),
+            wp_kses_post($content)
+        );
     }
 
     public function menu() {
