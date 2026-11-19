@@ -58,9 +58,11 @@ if (!$psv_php_ok || !$psv_wp_ok) {
 $psv_required_files = array(
     'includes/class-psv-core.php',
     'includes/class-psv-rest.php',
-    'includes/class-psv-admin.php',
     'includes/class-psv-elementor.php',
 );
+if (is_admin()) {
+    $psv_required_files[] = 'includes/class-psv-admin.php';
+}
 
 foreach ($psv_required_files as $psv_relative_file) {
     if (!is_readable(PSV_PATH . $psv_relative_file)) {
@@ -76,8 +78,10 @@ foreach ($psv_required_files as $psv_relative_file) {
 try {
     require_once PSV_PATH . 'includes/class-psv-core.php';
     require_once PSV_PATH . 'includes/class-psv-rest.php';
-    require_once PSV_PATH . 'includes/class-psv-admin.php';
     require_once PSV_PATH . 'includes/class-psv-elementor.php';
+    if (is_admin()) {
+        require_once PSV_PATH . 'includes/class-psv-admin.php';
+    }
     delete_option('psv_bootstrap_error');
 } catch (Throwable $error) {
     update_option(
