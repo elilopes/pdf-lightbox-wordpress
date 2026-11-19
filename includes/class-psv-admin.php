@@ -53,8 +53,8 @@ class PSV_Admin {
         $input = is_array($input) ? wp_unslash($input) : array();
 
         return array(
-            'google_client_id' => isset($input['google_client_id'])
-                ? sanitize_text_field($input['google_client_id'])
+            'google_client_id' => isset($input['google_client_id']) && is_scalar($input['google_client_id'])
+                ? sanitize_text_field((string) $input['google_client_id'])
                 : '',
             'auto_detect' => empty($input['auto_detect']) ? 0 : 1,
         );
@@ -273,12 +273,12 @@ class PSV_Admin {
             wp_die(esc_html__('Acesso negado.', 'pdf-smart-viewer'));
         }
 
-        $id = isset($_POST['id']) ? absint(wp_unslash($_POST['id'])) : 0;
+        $raw_id = isset($_POST['id']) ? wp_unslash($_POST['id']) : 0;
+        $id = is_scalar($raw_id) ? absint($raw_id) : 0;
         check_admin_referer('psv_moderate_' . $id);
 
-        $status = isset($_POST['status'])
-            ? sanitize_key(wp_unslash($_POST['status']))
-            : '';
+        $raw_status = isset($_POST['status']) ? wp_unslash($_POST['status']) : '';
+        $status = is_scalar($raw_status) ? sanitize_key((string) $raw_status) : '';
 
         global $wpdb;
         $table = PSV_Core::table();
