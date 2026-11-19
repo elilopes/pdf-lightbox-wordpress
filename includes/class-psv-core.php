@@ -136,6 +136,7 @@ final class PSV_Core {
             'restUrl' => esc_url_raw(rest_url('psv/v1/')),
             'nonce' => wp_create_nonce('wp_rest'),
             'googleClientId' => isset($options['google_client_id']) ? sanitize_text_field($options['google_client_id']) : '',
+            'aiEnabled' => !empty($options['openai_api_key']),
             'autoDetect' => !empty($options['auto_detect']),
             'strings' => array(
                 'loading' => __('Carregando PDF…', 'pdf-smart-viewer'),
@@ -209,6 +210,8 @@ final class PSV_Core {
             'button' => 'yes',
             'comments' => 'yes',
             'download' => 'yes',
+            'ai' => 'yes',
+            'qrcode' => 'yes',
         ), (array) $atts, 'pdf_viewer');
 
         $url = isset($atts['url']) ? $atts['url'] : '';
@@ -233,11 +236,13 @@ final class PSV_Core {
             $title,
             'yes' === $atts['comments'],
             'yes' === $atts['download'],
-            'yes' === $atts['button']
+            'yes' === $atts['button'],
+            'yes' === $atts['ai'],
+            'yes' === $atts['qrcode']
         );
     }
 
-    private function launcher($url, $key, $title, $comments = true, $download = true, $button = true) {
+    private function launcher($url, $key, $title, $comments = true, $download = true, $button = true, $ai = true, $qrcode = true) {
         ob_start();
         ?>
         <span class="psv-launcher"
@@ -245,7 +250,9 @@ final class PSV_Core {
             data-psv-key="<?php echo esc_attr($key); ?>"
             data-psv-title="<?php echo esc_attr($title); ?>"
             data-psv-comments="<?php echo $comments ? '1' : '0'; ?>"
-            data-psv-download="<?php echo $download ? '1' : '0'; ?>">
+            data-psv-download="<?php echo $download ? '1' : '0'; ?>"
+            data-psv-ai="<?php echo $ai ? '1' : '0'; ?>"
+            data-psv-qrcode="<?php echo $qrcode ? '1' : '0'; ?>">
             <?php if ($button) : ?>
                 <button type="button" class="psv-open"><?php echo esc_html($title); ?></button>
             <?php else : ?>
