@@ -133,7 +133,21 @@ class PSV_Admin {
 
         $ids = array_map('absint', $ids);
         $id_list = implode(',', $ids);
-        $wpdb->query("UPDATE {$table} SET parent_id = 0 WHERE parent_id IN ({$id_list}) AND author_email <> '" . esc_sql($email_address) . "'");
+        $updated = $wpdb->query(
+            $wpdb->prepare(
+                "UPDATE {$table} SET parent_id = 0 WHERE parent_id IN ({$id_list}) AND author_email <> %s",
+                $email_address
+            )
+        );
+        if (false === $updated) {
+            return array(
+                'items_removed' => false,
+                'items_retained' => true,
+                'messages' => array(__('Não foi possível atualizar as respostas vinculadas aos comentários.', 'pdf-smart-viewer')),
+                'done' => true,
+            );
+        }
+
         $removed = $wpdb->query("DELETE FROM {$table} WHERE id IN ({$id_list})");
         if (false === $removed) {
             return array(
