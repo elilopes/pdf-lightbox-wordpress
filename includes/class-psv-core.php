@@ -165,6 +165,11 @@ final class PSV_Core {
 
         $content = (string) $post->post_content;
         $uses_viewer = has_shortcode($content, 'pdf_viewer') || has_shortcode($content, 'pdf_lightbox');
+        if (!$uses_viewer) {
+            $uses_viewer = false !== strpos($content, '<pdf-smart-viewer') ||
+                false !== strpos($content, 'class="pdf-smart-viewer"') ||
+                false !== strpos($content, "class='pdf-smart-viewer'");
+        }
 
         if (!$uses_viewer && function_exists('has_block')) {
             $uses_viewer = has_block('pdf-smart-viewer/viewer', $post);
