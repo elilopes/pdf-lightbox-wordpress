@@ -1021,7 +1021,7 @@
             const link = document.createElement('a');
             const safeTitle = String(activeDocument.title || 'documento')
                 .replace(/[\\\\/:*?"<>|]+/g, '-')
-                .replace(/\\s+/g, '-')
+                .replace(/\s+/g, '-')
                 .slice(0, 80);
             link.href = objectUrl;
             link.download = (safeTitle || 'documento') + '.docx';
