@@ -103,6 +103,11 @@ final class PSV_Core {
             KEY parent_id (parent_id)
         ) {$charset};";
         dbDelta($sql);
+
+        $installed_table = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table));
+        if ($installed_table !== $table) {
+            throw new RuntimeException('A tabela de comentários do PDF Smart Viewer não foi criada.');
+        }
     }
 
     private function __construct() {
