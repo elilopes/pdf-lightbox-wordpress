@@ -23,7 +23,10 @@ function psv_uninstall_cleanup_site() {
     delete_option('psv_settings');
     delete_option('psv_bootstrap_error');
 
-    $transient_like = $wpdb->esc_like('_transient_psv_rate_') . '%';
+    $transient_like = $wpdb->esc_like('_transient_psv_rate_');
+            // Also remove rate-limit keys used by the optional AI assistant.
+            $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_psv_ai_rate_%' OR option_name LIKE '_transient_timeout_psv_ai_rate_%");
+            // ') . '%';
     $timeout_like = $wpdb->esc_like('_transient_timeout_psv_rate_') . '%';
 
     $wpdb->query(
