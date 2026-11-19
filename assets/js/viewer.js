@@ -350,6 +350,10 @@
             documentUrl = normalizeDocumentUrl(data.url);
             data.key = data.key || await hashKey(documentUrl);
         } catch (error) {
+            if (currentSession !== sessionId) {
+                return;
+            }
+
             const modal = getModal();
             modal.classList.add('is-open');
             modal.querySelector('.psv-status').hidden = false;
