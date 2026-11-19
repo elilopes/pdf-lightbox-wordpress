@@ -4,7 +4,7 @@
  * Description: Visualizador PDF em Lightbox com miniaturas, zoom, pesquisa, anotações locais, favoritos, histórico, comentários moderados e Google Drive.
  * Version: 1.3.0
  * Author: PDF Smart Viewer
- * Text Domain: pdf-smart-viewer
+ * License: GPL-2.0-or-later\n * License URI: https://www.gnu.org/licenses/gpl-2.0.html\n * Text Domain: pdf-smart-viewer\n * Domain Path: /languages
  * Requires at least: 6.0
  * Requires PHP: 7.4
  */
