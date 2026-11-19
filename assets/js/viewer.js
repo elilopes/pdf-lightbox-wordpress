@@ -336,6 +336,14 @@
         }
 
         const currentSession = cancelCurrentDocument();
+        activeDocument = null;
+
+        const openingModal = getModal();
+        openingModal.classList.add('is-open');
+        document.body.classList.add('psv-lock');
+        openingModal.querySelector('.psv-status').hidden = false;
+        openingModal.querySelector('.psv-status').textContent = 'Preparando documento…';
+
         let documentUrl;
 
         try {
@@ -849,6 +857,8 @@
 
         output.textContent = 'Pesquisando…';
 
+        const searchDocument = pdfDocument;
+        const searchSession = sessionId;
         const normalizedQuery = query.toLocaleLowerCase();
         let startPage = pageNumber;
         let startOffset = 0;
@@ -862,8 +872,18 @@
 
         for (let checked = 0; checked < pdfDocument.numPages; checked += 1) {
             const candidatePage = ((startPage - 1 + checked) % pdfDocument.numPages) + 1;
-            const page = await pdfDocument.getPage(candidatePage);
+            const page = await searchDocument.getPage(candidatePage);
+
+            if (searchSession !== sessionId || searchDocument !== pdfDocument) {
+                return;
+            }
+
             const content = await page.getTextContent();
+
+            if (searchSession !== sessionId || searchDocument !== pdfDocument) {
+                return;
+            }
+
             const text = content.items.map(function (item) {
                 return item.str;
             }).join(' ');
