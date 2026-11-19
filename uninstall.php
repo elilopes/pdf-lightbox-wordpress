@@ -23,19 +23,20 @@ function psv_uninstall_cleanup_site() {
     delete_option('psv_settings');
     delete_option('psv_bootstrap_error');
 
-    $transient_like = $wpdb->esc_like('_transient_psv_rate_');
-            // Also remove rate-limit keys used by the optional AI assistant.
-            $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_psv_ai_rate_%' OR option_name LIKE '_transient_timeout_psv_ai_rate_%");
-            // ') . '%';
-    $timeout_like = $wpdb->esc_like('_transient_timeout_psv_rate_') . '%';
-
-    $wpdb->query(
-        $wpdb->prepare(
-            "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
-            $transient_like,
-            $timeout_like
-        )
+    $transient_prefixes = array(
+        '_transient_psv_rate_',
+        '_transient_timeout_psv_rate_',
+        '_transient_psv_ai_rate_',
+        '_transient_timeout_psv_ai_rate_',
     );
+    foreach ($transient_prefixes as $prefix) {
+        $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $wpdb->esc_like($prefix) . '%'
+            )
+        );
+    }
 }
 
 if (is_multisite()) {
