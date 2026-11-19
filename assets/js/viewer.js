@@ -336,7 +336,8 @@
         modal.querySelector('[data-a="qrcode"]').hidden = !data.qrcode;
         modal.querySelector('.psv-ai-panel').hidden = true;
         modal.querySelector('.psv-qr-panel').hidden = true;
-        modal.querySelector('.psv-dialog').classList.remove('psv-reading-mode', 'psv-dark-mode', 'psv-high-contrast');
+        modal.querySelector('.psv-dialog').classList.remove('psv-reading-mode', 'psv-dark-mode', 'psv-high-contrast', 'psv-show-sidebar');
+        modal.querySelector('[data-a="outline"]').setAttribute('aria-expanded', 'true');
         ['theme', 'contrast', 'reader'].forEach(function (action) {
             modal.querySelector('[data-a="' + action + '"]').setAttribute('aria-pressed', 'false');
         });
