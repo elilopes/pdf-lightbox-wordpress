@@ -154,7 +154,7 @@ class PSV_Admin {
                 'items_removed' => false,
                 'items_retained' => true,
                 'messages' => array(__('Não foi possível excluir todos os comentários deste endereço de e-mail.', 'pdf-smart-viewer')),
-                'done' => true,
+                'done' => count($ids) < 50,
             );
         }
 
