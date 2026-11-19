@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PDF Smart Viewer
  * Description: Visualizador PDF em Lightbox com miniaturas, zoom, pesquisa, anotações locais, favoritos, histórico, comentários moderados e Google Drive.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: PDF Smart Viewer
  * Text Domain: pdf-smart-viewer
  * Requires at least: 6.0
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('PSV_VERSION')) {
-    define('PSV_VERSION', '1.2.0');
+    define('PSV_VERSION', '1.3.0');
 }
 if (!defined('PSV_FILE')) {
     define('PSV_FILE', __FILE__);
@@ -119,7 +119,7 @@ add_action('plugins_loaded', function () {
         if (class_exists('PSV_REST')) {
             PSV_REST::instance();
         }
-        if (class_exists('PSV_Admin')) {
+        if (is_admin() && class_exists('PSV_Admin')) {
             PSV_Admin::instance();
         }
         if (class_exists('PSV_Elementor')) {
