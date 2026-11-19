@@ -121,6 +121,33 @@
     border-left: 1px solid #d8dee8;
 }
 
+.psv-comments[hidden] {
+    display: none !important;
+}
+
+.psv-comment-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-top: 12px;
+    font-size: 12px;
+}
+
+.psv-comment-pagination button {
+    padding: 6px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background: #f8fafc;
+    color: #172033;
+    cursor: pointer;
+}
+
+.psv-comment-pagination button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
 .psv-sidebar h3,
 .psv-comments h3 {
     margin: 0 0 10px;
@@ -318,8 +345,9 @@
     }
 
     .psv-sidebar,
-    .psv-comments {
-        display: none;
+    .psv-comments,
+    .psv-tools [data-a="comments"] {
+        display: none !important;
     }
 
     .psv-stage {
