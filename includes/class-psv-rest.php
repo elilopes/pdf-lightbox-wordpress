@@ -105,13 +105,18 @@ class PSV_REST {
         $per_page = min(50, max(1, absint($request->get_param('per_page')) ?: 20));
         $table = PSV_Core::table();
 
-        $total = (int) $wpdb->get_var(
+        $total_result = $wpdb->get_var(
             $wpdb->prepare(
                 "SELECT COUNT(*) FROM {$table}
                 WHERE document_key = %s AND status = 'approved' AND parent_id = 0",
                 $key
             )
         );
+        if ('' !== $wpdb->last_error) {
+            error_log('[PDF Smart Viewer] Comment count query failed: ' . $wpdb->last_error);
+            return new WP_Error('psv_database', __('Não foi possível consultar os comentários.', 'pdf-smart-viewer'), array('status' => 500));
+        }
+        $total = (int) $total_result;
         $total_pages = max(1, (int) ceil($total / $per_page));
         $page = min($page, $total_pages);
         $offset = ($page - 1) * $per_page;
@@ -127,6 +132,10 @@ class PSV_REST {
                 $offset
             )
         );
+        if ('' !== $wpdb->last_error) {
+            error_log('[PDF Smart Viewer] Comment page query failed: ' . $wpdb->last_error);
+            return new WP_Error('psv_database', __('Não foi possível consultar os comentários.', 'pdf-smart-viewer'), array('status' => 500));
+        }
 
         $rows = array();
         if ($root_ids) {
@@ -137,9 +146,14 @@ class PSV_REST {
                 FROM {$table}
                 WHERE status = 'approved'
                 AND (id IN ({$id_list}) OR parent_id IN ({$id_list}))
-                ORDER BY created_at ASC, id ASC",
+                ORDER BY created_at ASC, id ASC
+                LIMIT 500",
                 ARRAY_A
             );
+            if ('' !== $wpdb->last_error) {
+                error_log('[PDF Smart Viewer] Comment content query failed: ' . $wpdb->last_error);
+                return new WP_Error('psv_database', __('Não foi possível carregar os comentários.', 'pdf-smart-viewer'), array('status' => 500));
+            }
         }
 
         $response = new WP_REST_Response(array(
@@ -212,7 +226,7 @@ class PSV_REST {
         if ($parent) {
             $parent_row = $wpdb->get_row(
                 $wpdb->prepare(
-                    "SELECT id, document_key FROM " . PSV_Core::table() . " WHERE id = %d AND status = 'approved'",
+                    "SELECT id, document_key FROM " . PSV_Core::table() . " WHERE id = %d AND status = 'approved' AND parent_id = 0",
                     $parent
                 )
             );
