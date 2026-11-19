@@ -212,6 +212,7 @@ final class PSV_Core {
             'download' => 'yes',
             'ai' => 'yes',
             'qrcode' => 'yes',
+            'height' => 700,
         ), (array) $atts, 'pdf_viewer');
 
         $url = isset($atts['url']) ? $atts['url'] : '';
@@ -238,11 +239,12 @@ final class PSV_Core {
             'yes' === $atts['download'],
             'yes' === $atts['button'],
             'yes' === $atts['ai'],
-            'yes' === $atts['qrcode']
+            'yes' === $atts['qrcode'],
+            min(2000, max(300, absint($atts['height'])))
         );
     }
 
-    private function launcher($url, $key, $title, $comments = true, $download = true, $button = true, $ai = true, $qrcode = true) {
+    private function launcher($url, $key, $title, $comments = true, $download = true, $button = true, $ai = true, $qrcode = true, $height = 700) {
         ob_start();
         ?>
         <span class="psv-launcher"
@@ -252,7 +254,8 @@ final class PSV_Core {
             data-psv-comments="<?php echo $comments ? '1' : '0'; ?>"
             data-psv-download="<?php echo $download ? '1' : '0'; ?>"
             data-psv-ai="<?php echo $ai ? '1' : '0'; ?>"
-            data-psv-qrcode="<?php echo $qrcode ? '1' : '0'; ?>">
+            data-psv-qrcode="<?php echo $qrcode ? '1' : '0'; ?>"
+            data-psv-height="<?php echo esc_attr(min(2000, max(300, absint($height)))); ?>">
             <?php if ($button) : ?>
                 <button type="button" class="psv-open"><?php echo esc_html($title); ?></button>
             <?php else : ?>
@@ -268,6 +271,8 @@ final class PSV_Core {
             'url' => '',
             'text' => 'Visualizar PDF',
             'comments' => 'yes',
+            'ai' => 'yes',
+            'qrcode' => 'yes',
         ), (array) $atts, 'pdf_lightbox');
 
         return $this->shortcode(array(
@@ -275,6 +280,8 @@ final class PSV_Core {
             'title' => sanitize_text_field($atts['text']),
             'comments' => 'yes' === $atts['comments'] ? 'yes' : 'no',
             'button' => 'yes',
+            'ai' => 'yes' === $atts['ai'] ? 'yes' : 'no',
+            'qrcode' => 'yes' === $atts['qrcode'] ? 'yes' : 'no',
         ));
     }
 
